@@ -1,0 +1,10 @@
+# Environment variables
+.env
+.env.*
+
+# Optional: Local databases or caches
+*.sqlite
+*.db
+.cache/
+
+__pycache__/

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rate AI Analysis - Sales Sentiment Validation App</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1>Rate AI Analysis</h1>
+            <div class="user-info">
+                {{ user_email }} | Deal: {{ deal_id }}
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="nav">
+            <div class="nav-buttons">
+                <a href="/activities/{{ deal_id }}" class="btn btn-secondary" id="back-to-activities">← Back to Activities</a>
+                <a href="/logout" class="btn btn-secondary">Logout</a>
+            </div>
+        </div>
+        
+        {% if error %}
+        <div class="alert alert-danger">
+            {{ error }}
+        </div>
+        {% else %}
+        
+        <div class="card">
+            <h2>📊 AI Analysis Rating</h2>
+            <p>Please rate each section of the AI's analysis based on how accurately it reflects the salesperson's behavior and sentiment as observed in the deal activities.</p>
+            
+            <div class="alert alert-info">
+                <strong>Rating Scale:</strong> 
+                5 = Excellent | 4 = Good | 3 = Fair | 2 = Poor | 1 = Very Poor
+                <br>
+                <strong>Confidence Scale:</strong> 
+                5 = Very Confident | 4 = Confident | 3 = Somewhat Confident | 2 = Less Confident | 1 = Not Confident
+            </div>
+        </div>
+        
+        <form id="rating-form" method="post" action="/submit-rating">
+            <input type="hidden" name="deal_id" value="{{ deal_id }}">
+            
+            <!-- Overall Sentiment -->
+            <div class="rating-section">
+                <h3>1. Overall Sentiment</h3>
+                <div class="llm-output">
+                    <strong>AI Assessment:</strong> {{ llm_output.overall_sentiment }} (Score: {{ llm_output.sentiment_score }}, Confidence: {{ llm_output.confidence }})
+                </div>
+                <div class="rating-controls">
+                    <div class="rating-group" data-field="overall_sentiment">
+                        <label>Rate Accuracy (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="overall_sentiment_score" value="{{ i }}" id="overall_sentiment_score_{{ i }}">
+                            <label for="overall_sentiment_score_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="rating-group">
+                        <label>Your Confidence (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="overall_sentiment_confidence" value="{{ i }}" id="overall_sentiment_confidence_{{ i }}">
+                            <label for="overall_sentiment_confidence_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional):</label>
+                    <textarea name="overall_sentiment_notes" class="notes-textarea" placeholder="Explain your rating if you disagree with the AI's assessment..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Activity Breakdown -->
+            <div class="rating-section">
+                <h3>2. Activity Breakdown</h3>
+                <div class="llm-output">
+                    <strong>AI Assessment:</strong>
+                    <pre>{{ llm_output.activity_breakdown | tojson(indent=2) }}</pre>
+                </div>
+                <div class="rating-controls">
+                    <div class="rating-group" data-field="activity_breakdown">
+                        <label>Rate Accuracy (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="activity_breakdown_score" value="{{ i }}" id="activity_breakdown_score_{{ i }}">
+                            <label for="activity_breakdown_score_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="rating-group">
+                        <label>Your Confidence (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="activity_breakdown_confidence" value="{{ i }}" id="activity_breakdown_confidence_{{ i }}">
+                            <label for="activity_breakdown_confidence_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional):</label>
+                    <textarea name="activity_breakdown_notes" class="notes-textarea" placeholder="Comments on the activity-by-activity analysis..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Deal Momentum Indicators -->
+            <div class="rating-section">
+                <h3>3. Deal Momentum Indicators</h3>
+                <div class="llm-output">
+                    <strong>AI Assessment:</strong>
+                    <pre>{{ llm_output.deal_momentum_indicators | tojson(indent=2) }}</pre>
+                </div>
+                <div class="rating-controls">
+                    <div class="rating-group" data-field="deal_momentum_indicators">
+                        <label>Rate Accuracy (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="deal_momentum_indicators_score" value="{{ i }}" id="deal_momentum_indicators_score_{{ i }}">
+                            <label for="deal_momentum_indicators_score_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="rating-group">
+                        <label>Your Confidence (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="deal_momentum_indicators_confidence" value="{{ i }}" id="deal_momentum_indicators_confidence_{{ i }}">
+                            <label for="deal_momentum_indicators_confidence_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional):</label>
+                    <textarea name="deal_momentum_indicators_notes" class="notes-textarea" placeholder="Comments on deal progression assessment..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Reasoning -->
+            <div class="rating-section">
+                <h3>4. Reasoning</h3>
+                <div class="llm-output">
+                    <strong>AI Reasoning:</strong>
+                    <div style="white-space: pre-wrap;">{{ llm_output.reasoning }}</div>
+                </div>
+                <div class="rating-controls">
+                    <div class="rating-group" data-field="reasoning">
+                        <label>Rate Quality (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="reasoning_score" value="{{ i }}" id="reasoning_score_{{ i }}">
+                            <label for="reasoning_score_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="rating-group">
+                        <label>Your Confidence (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="reasoning_confidence" value="{{ i }}" id="reasoning_confidence_{{ i }}">
+                            <label for="reasoning_confidence_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional):</label>
+                    <textarea name="reasoning_notes" class="notes-textarea" placeholder="Comments on the AI's reasoning quality..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Professional Gaps -->
+            <div class="rating-section">
+                <h3>5. Professional Gaps</h3>
+                <div class="llm-output">
+                    <strong>AI Identified Gaps:</strong>
+                    <ul>
+                        {% for gap in llm_output.professional_gaps %}
+                        <li>{{ gap }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="rating-controls">
+                    <div class="rating-group" data-field="professional_gaps">
+                        <label>Rate Accuracy (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="professional_gaps_score" value="{{ i }}" id="professional_gaps_score_{{ i }}">
+                            <label for="professional_gaps_score_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="rating-group">
+                        <label>Your Confidence (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="professional_gaps_confidence" value="{{ i }}" id="professional_gaps_confidence_{{ i }}">
+                            <label for="professional_gaps_confidence_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional):</label>
+                    <textarea name="professional_gaps_notes" class="notes-textarea" placeholder="Comments on identified performance gaps..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Excellence Indicators -->
+            <div class="rating-section">
+                <h3>6. Excellence Indicators</h3>
+                <div class="llm-output">
+                    <strong>AI Identified Excellence:</strong>
+                    <ul>
+                        {% for indicator in llm_output.excellence_indicators %}
+                        <li>{{ indicator }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="rating-controls">
+                    <div class="rating-group" data-field="excellence_indicators">
+                        <label>Rate Accuracy (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="excellence_indicators_score" value="{{ i }}" id="excellence_indicators_score_{{ i }}">
+                            <label for="excellence_indicators_score_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="rating-group">
+                        <label>Your Confidence (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="excellence_indicators_confidence" value="{{ i }}" id="excellence_indicators_confidence_{{ i }}">
+                            <label for="excellence_indicators_confidence_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional):</label>
+                    <textarea name="excellence_indicators_notes" class="notes-textarea" placeholder="Comments on identified excellence..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Risk Indicators -->
+            <div class="rating-section">
+                <h3>7. Risk Indicators</h3>
+                <div class="llm-output">
+                    <strong>AI Identified Risks:</strong>
+                    <ul>
+                        {% for risk in llm_output.risk_indicators %}
+                        <li>{{ risk }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="rating-controls">
+                    <div class="rating-group" data-field="risk_indicators">
+                        <label>Rate Accuracy (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="risk_indicators_score" value="{{ i }}" id="risk_indicators_score_{{ i }}">
+                            <label for="risk_indicators_score_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="rating-group">
+                        <label>Your Confidence (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="risk_indicators_confidence" value="{{ i }}" id="risk_indicators_confidence_{{ i }}">
+                            <label for="risk_indicators_confidence_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional):</label>
+                    <textarea name="risk_indicators_notes" class="notes-textarea" placeholder="Comments on identified risks..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Opportunity Indicators -->
+            <div class="rating-section">
+                <h3>8. Opportunity Indicators</h3>
+                <div class="llm-output">
+                    <strong>AI Identified Opportunities:</strong>
+                    <ul>
+                        {% for opportunity in llm_output.opportunity_indicators %}
+                        <li>{{ opportunity }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="rating-controls">
+                    <div class="rating-group" data-field="opportunity_indicators">
+                        <label>Rate Accuracy (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="opportunity_indicators_score" value="{{ i }}" id="opportunity_indicators_score_{{ i }}">
+                            <label for="opportunity_indicators_score_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="rating-group">
+                        <label>Your Confidence (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="opportunity_indicators_confidence" value="{{ i }}" id="opportunity_indicators_confidence_{{ i }}">
+                            <label for="opportunity_indicators_confidence_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional):</label>
+                    <textarea name="opportunity_indicators_notes" class="notes-textarea" placeholder="Comments on identified opportunities..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Temporal Trend -->
+            <div class="rating-section">
+                <h3>9. Temporal Trend</h3>
+                <div class="llm-output">
+                    <strong>AI Assessment:</strong> {{ llm_output.temporal_trend }}
+                </div>
+                <div class="rating-controls">
+                    <div class="rating-group" data-field="temporal_trend">
+                        <label>Rate Accuracy (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="temporal_trend_score" value="{{ i }}" id="temporal_trend_score_{{ i }}">
+                            <label for="temporal_trend_score_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="rating-group">
+                        <label>Your Confidence (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="temporal_trend_confidence" value="{{ i }}" id="temporal_trend_confidence_{{ i }}">
+                            <label for="temporal_trend_confidence_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional):</label>
+                    <textarea name="temporal_trend_notes" class="notes-textarea" placeholder="Comments on trend assessment..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Recommended Actions -->
+            <div class="rating-section">
+                <h3>10. Recommended Actions</h3>
+                <div class="llm-output">
+                    <strong>AI Recommendations:</strong>
+                    <ul>
+                        {% for action in llm_output.recommended_actions %}
+                        <li>{{ action }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="rating-controls">
+                    <div class="rating-group" data-field="recommended_actions">
+                        <label>Rate Quality (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="recommended_actions_score" value="{{ i }}" id="recommended_actions_score_{{ i }}">
+                            <label for="recommended_actions_score_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="rating-group">
+                        <label>Your Confidence (1-5):</label>
+                        <div class="rating-stars">
+                            {% for i in range(1, 6) %}
+                            <input type="radio" name="recommended_actions_confidence" value="{{ i }}" id="recommended_actions_confidence_{{ i }}">
+                            <label for="recommended_actions_confidence_{{ i }}">⭐</label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional):</label>
+                    <textarea name="recommended_actions_notes" class="notes-textarea" placeholder="Comments on the AI's recommendations..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Submit Button -->
+            <div class="card" style="text-align: center; background: #f8f9fa; margin-top: 2rem;">
+                <h3>✅ Submit Your Rating</h3>
+                <p>Please review all your ratings before submitting. You cannot change them after submission.</p>
+                <button type="submit" id="submit-rating" class="btn btn-success btn-lg">
+                    Submit Rating
+                </button>
+            </div>
+        </form>
+        
+        {% endif %}
+    </div>
+    
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

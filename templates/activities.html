@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deal Activities - Deal Validation App</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1>Deal Activities Review</h1>
+            <div class="user-info">
+                {{ user_email }} | Deal: {{ deal_id }}
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="nav">
+            <div class="nav-buttons">
+                <a href="/instructions" class="btn btn-secondary">← Instructions</a>
+                <a href="/rating/{{ deal_id }}" class="btn btn-primary">Rate AI Analysis →</a>
+                <a href="/logout" class="btn btn-secondary">Logout</a>
+            </div>
+        </div>
+        
+        {% if error %}
+        <div class="alert alert-danger">
+            {{ error }}
+        </div>
+        {% else %}
+        
+        <div class="card">
+            <h2>📋 Deal Information</h2>
+            <div class="deal-info" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <strong>Deal ID:</strong> {{ deal.deal_id }}
+                </div>
+                <div>
+                    <strong>Amount:</strong> ${{ "{:,.2f}".format(deal.amount|float) }}
+                </div>
+                <div>
+                    <strong>Stage:</strong> {{ deal.dealstage.title() }}
+                </div>
+                <div>
+                    <strong>Type:</strong> {{ deal.dealtype.title() }}
+                </div>
+                <div>
+                    <strong>Probability:</strong> {{ deal.deal_stage_probability }}%
+                </div>
+                <div>
+                    <strong>Created:</strong> {{ deal.createdate[:10] }}
+                </div>
+                {% if deal.closedate %}
+                <div>
+                    <strong>Closed:</strong> {{ deal.closedate[:10] }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="alert alert-info">
+                <strong>📖 Instructions:</strong> Please read through all activities below in chronological order. Pay attention to communication patterns, deal progression, client engagement, and professional behavior. When ready, click "Rate AI Analysis" to evaluate the AI's assessment.
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>📅 Activity Timeline ({{ activities|length }} activities)</h2>
+            
+            <div class="activities-container">
+                {% for activity in activities %}
+                <div class="activity-item fade-in">
+                    <div class="activity-header">
+                        <span class="activity-type {{ activity.activity_type }}">
+                            {{ activity.activity_type.upper() }}
+                        </span>
+                        <span class="activity-timestamp">
+                            {% if activity.get('sent_at') %}
+                                {{ activity.sent_at[:19].replace('T', ' ') }}
+                            {% elif activity.get('createdate') %}
+                                {{ activity.createdate[:19].replace('T', ' ') }}
+                            {% elif activity.get('meeting_start_time') %}
+                                {{ activity.meeting_start_time[:19].replace('T', ' ') }}
+                            {% elif activity.get('lastmodifieddate') %}
+                                {{ activity.lastmodifieddate[:19].replace('T', ' ') }}
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <div class="activity-content">
+                        {% if activity.activity_type == 'email' %}
+                            {% if activity.get('subject') %}
+                                <div class="subject">
+                                    <strong>Subject:</strong> {{ activity.subject }}
+                                </div>
+                            {% endif %}
+                            {% if activity.get('body') %}
+                                <div class="body">
+                                    {{ activity.body }}
+                                </div>
+                            {% else %}
+                                <div class="body">
+                                    <em>No email content available</em>
+                                </div>
+                            {% endif %}
+                        
+                        {% elif activity.activity_type == 'call' %}
+                            {% if activity.get('call_title') %}
+                                <div class="subject">
+                                    <strong>Call:</strong> {{ activity.call_title }}
+                                </div>
+                            {% endif %}
+                            {% if activity.get('call_body') %}
+                                <div class="body">
+                                    {{ activity.call_body }}
+                                </div>
+                            {% else %}
+                                <div class="body">
+                                    <em>No call notes available</em>
+                                </div>
+                            {% endif %}
+                        
+                        {% elif activity.activity_type == 'meeting' %}
+                            {% if activity.get('meeting_title') %}
+                                <div class="subject">
+                                    <strong>Meeting:</strong> {{ activity.meeting_title }}
+                                </div>
+                            {% endif %}
+                            {% if activity.get('meeting_location') %}
+                                <div class="body">
+                                    <strong>Location:</strong> {{ activity.meeting_location }}
+                                </div>
+                            {% endif %}
+                            {% if activity.get('internal_meeting_notes') %}
+                                <div class="body">
+                                    <strong>Notes:</strong> {{ activity.internal_meeting_notes }}
+                                </div>
+                            {% else %}
+                                <div class="body">
+                                    <em>No meeting notes available</em>
+                                </div>
+                            {% endif %}
+                        
+                        {% elif activity.activity_type == 'note' %}
+                            {% if activity.get('note_body') %}
+                                <div class="body">
+                                    {{ activity.note_body }}
+                                </div>
+                            {% else %}
+                                <div class="body">
+                                    <em>No note content available</em>
+                                </div>
+                            {% endif %}
+                        
+                        {% elif activity.activity_type == 'task' %}
+                            {% if activity.get('task_subject') %}
+                                <div class="subject">
+                                    <strong>Task:</strong> {{ activity.task_subject }}
+                                </div>
+                            {% endif %}
+                            {% if activity.get('task_body') %}
+                                <div class="body">
+                                    {{ activity.task_body }}
+                                </div>
+                            {% else %}
+                                <div class="body">
+                                    <em>No task description available</em>
+                                </div>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    
+                    <div class="activity-metadata">
+                        {% if activity.get('direction') %}
+                            <span class="metadata-item">{{ activity.direction.title() }}</span>
+                        {% endif %}
+                        {% if activity.get('call_duration') %}
+                            <span class="metadata-item">Duration: {{ activity.call_duration }} min</span>
+                        {% endif %}
+                        {% if activity.get('call_direction') %}
+                            <span class="metadata-item">{{ activity.call_direction.title() }}</span>
+                        {% endif %}
+                        {% if activity.get('call_status') %}
+                            <span class="metadata-item">Status: {{ activity.call_status.title() }}</span>
+                        {% endif %}
+                        {% if activity.get('task_status') %}
+                            <span class="metadata-item">Status: {{ activity.task_status.title().replace('_', ' ') }}</span>
+                        {% endif %}
+                        {% if activity.get('task_priority') and activity.task_priority != 'NONE' %}
+                            <span class="metadata-item">Priority: {{ activity.task_priority.title() }}</span>
+                        {% endif %}
+                        {% if activity.get('task_type') %}
+                            <span class="metadata-item">Type: {{ activity.task_type.title() }}</span>
+                        {% endif %}
+                        {% if activity.get('meeting_outcome') %}
+                            <span class="metadata-item">Outcome: {{ activity.meeting_outcome.title() }}</span>
+                        {% endif %}
+                        {% if activity.get('state') %}
+                            <span class="metadata-item">State: {{ activity.state.title() }}</span>
+                        {% endif %}
+                        {% if activity.get('from') %}
+                            <span class="metadata-item">From: {{ activity.from }}</span>
+                        {% endif %}
+                        {% if activity.get('to') and activity.to|length > 0 %}
+                            <span class="metadata-item">To: {{ activity.to|join(', ') }}</span>
+                        {% endif %}
+                        {% if activity.get('id') %}
+                            <span class="metadata-item">ID: {{ activity.id }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="card" style="text-align: center; background: #f8f9fa;">
+            <h3>✅ Ready to Rate the AI Analysis?</h3>
+            <p>You've reviewed all {{ activities|length }} activities for this deal. Now it's time to evaluate how well the AI understood the salesperson's sentiment and behavior.</p>
+            <a href="/rating/{{ deal_id }}" class="btn btn-primary btn-lg">
+                Rate AI Analysis
+            </a>
+        </div>
+        
+        {% endif %}
+    </div>
+    
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
