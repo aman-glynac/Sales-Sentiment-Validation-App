@@ -136,43 +136,76 @@ class DealValidationApp {
             const inputs = group.querySelectorAll('input[type="radio"]');
             const labels = group.querySelectorAll('label');
             
-            // Add hover effect
-            labels.forEach((label, index) => {
-                label.addEventListener('mouseenter', () => {
-                    labels.forEach((l, i) => {
-                        if (i <= index) {
-                            l.style.color = '#f59e0b';
+            // Create array of labels sorted by their star value for easier manipulation
+            const sortedLabels = Array.from(labels).sort((a, b) => {
+                const aValue = parseInt(a.getAttribute('for').split('_').pop());
+                const bValue = parseInt(b.getAttribute('for').split('_').pop());
+                return aValue - bValue;
+            });
+            
+            // Function to update star display
+            const updateStarDisplay = (rating = 0, isHover = false) => {
+                sortedLabels.forEach((label, index) => {
+                    const starValue = index + 1;
+                    label.classList.remove('active', 'hover', 'selected');
+                    
+                    if (starValue <= rating) {
+                        if (isHover) {
+                            label.classList.add('hover');
                         } else {
-                            l.style.color = '#e2e8f0';
+                            label.classList.add('active');
                         }
-                    });
+                    }
+                });
+            };
+            
+            // Add hover effects
+            sortedLabels.forEach((label, index) => {
+                const starValue = index + 1;
+                
+                label.addEventListener('mouseenter', () => {
+                    updateStarDisplay(starValue, true);
                 });
             });
             
-            // Reset on mouse leave
+            // Reset on mouse leave to show current selection
             group.addEventListener('mouseleave', () => {
                 const checked = group.querySelector('input:checked');
-                if (checked) {
-                    const checkedIndex = Array.from(inputs).indexOf(checked);
-                    labels.forEach((l, i) => {
-                        if (i <= checkedIndex) {
-                            l.style.color = '#f59e0b';
-                        } else {
-                            l.style.color = '#e2e8f0';
-                        }
-                    });
-                } else {
-                    labels.forEach(l => l.style.color = '#e2e8f0');
-                }
+                const currentRating = checked ? parseInt(checked.value) : 0;
+                updateStarDisplay(currentRating, false);
             });
             
-            // Handle change
+            // Handle radio button changes
             inputs.forEach(input => {
                 input.addEventListener('change', (e) => {
+                    const value = parseInt(e.target.value);
+                    updateStarDisplay(value, false);
+                    
+                    // Add selection animation
+                    const selectedLabel = sortedLabels[value - 1];
+                    if (selectedLabel) {
+                        selectedLabel.classList.add('selected');
+                        setTimeout(() => {
+                            selectedLabel.classList.remove('selected');
+                        }, 300);
+                    }
+                    
                     this.updateRating(e.target.name, e.target.value);
-                    this.updateSectionProgress();
+                    // Call the global function instead of this method
+                    if (typeof updateSectionProgress === 'function') {
+                        updateSectionProgress();
+                    }
                 });
             });
+            
+            // Initialize display - ensure all stars start as grey unless there's a pre-selected value
+            const checked = group.querySelector('input:checked');
+            if (checked) {
+                updateStarDisplay(parseInt(checked.value), false);
+            } else {
+                // Ensure all stars start as grey (no rating)
+                updateStarDisplay(0, false);
+            }
         });
     }
 

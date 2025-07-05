@@ -296,28 +296,6 @@
     }
   },
   {
-    "12692603044": {
-      "overall_sentiment": "unknown",
-      "sentiment_score": 0.0,
-      "confidence": 0.0,
-      "activity_breakdown": {},
-      "deal_momentum_indicators": {
-        "stage_progression": "unknown",
-        "client_engagement_trend": "unknown",
-        "competitive_position": "unknown"
-      },
-      "reasoning": "No reasoning provided",
-      "professional_gaps": [],
-      "excellence_indicators": [],
-      "risk_indicators": [],
-      "opportunity_indicators": [],
-      "temporal_trend": "stable",
-      "recommended_actions": [],
-      "context_analysis_notes": [],
-      "timestamp": "2025-07-04T13:55:29.530857"
-    }
-  },
-  {
     "12692679344": {
       "overall_sentiment": "negative",
       "sentiment_score": -0.5,
@@ -754,28 +732,6 @@
         "Similar lost deals exhibited declining activity leading to loss"
       ],
       "timestamp": "2025-07-04T13:57:24.052889"
-    }
-  },
-  {
-    "12692767780": {
-      "overall_sentiment": "unknown",
-      "sentiment_score": 0.0,
-      "confidence": 0.0,
-      "activity_breakdown": {},
-      "deal_momentum_indicators": {
-        "stage_progression": "unknown",
-        "client_engagement_trend": "unknown",
-        "competitive_position": "unknown"
-      },
-      "reasoning": "No reasoning provided",
-      "professional_gaps": [],
-      "excellence_indicators": [],
-      "risk_indicators": [],
-      "opportunity_indicators": [],
-      "temporal_trend": "stable",
-      "recommended_actions": [],
-      "context_analysis_notes": [],
-      "timestamp": "2025-07-04T13:57:24.936630"
     }
   },
   {
@@ -4249,28 +4205,6 @@
         "Discovery call and proposal were baseline professional but lacked strategic closing actions"
       ],
       "timestamp": "2025-07-04T14:20:18.964832"
-    }
-  },
-  {
-    "17102763660": {
-      "overall_sentiment": "unknown",
-      "sentiment_score": 0.0,
-      "confidence": 0.0,
-      "activity_breakdown": {},
-      "deal_momentum_indicators": {
-        "stage_progression": "unknown",
-        "client_engagement_trend": "unknown",
-        "competitive_position": "unknown"
-      },
-      "reasoning": "No reasoning provided",
-      "professional_gaps": [],
-      "excellence_indicators": [],
-      "risk_indicators": [],
-      "opportunity_indicators": [],
-      "temporal_trend": "stable",
-      "recommended_actions": [],
-      "context_analysis_notes": [],
-      "timestamp": "2025-07-04T14:20:41.744791"
     }
   },
   {

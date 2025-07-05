@@ -116,5 +116,182 @@
       },
       "time_spent_seconds": 52
     }
+  },
+  "12692608340": {
+    "aman.jaiswar@glynac.ai": {
+      "user_email": "aman.jaiswar@glynac.ai",
+      "timestamp": "2025-07-05T14:10:47.712066",
+      "ratings": {
+        "overall_sentiment": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "activity_breakdown": {
+          "score": 4,
+          "confidence": 5,
+          "notes": ""
+        },
+        "deal_momentum_indicators": {
+          "score": 1,
+          "confidence": 1,
+          "notes": ""
+        },
+        "reasoning": {
+          "score": 2,
+          "confidence": 3,
+          "notes": ""
+        },
+        "professional_gaps": {
+          "score": 4,
+          "confidence": 2,
+          "notes": ""
+        },
+        "excellence_indicators": {
+          "score": 4,
+          "confidence": 5,
+          "notes": ""
+        },
+        "risk_indicators": {
+          "score": 5,
+          "confidence": 3,
+          "notes": ""
+        },
+        "opportunity_indicators": {
+          "score": 4,
+          "confidence": 2,
+          "notes": ""
+        },
+        "temporal_trend": {
+          "score": 4,
+          "confidence": 5,
+          "notes": ""
+        },
+        "recommended_actions": {
+          "score": 2,
+          "confidence": 4,
+          "notes": ""
+        }
+      },
+      "time_spent_seconds": 149
+    }
+  },
+  "12692624297": {
+    "aman.jaiswar@glynac.ai": {
+      "user_email": "aman.jaiswar@glynac.ai",
+      "timestamp": "2025-07-05T14:13:19.006569",
+      "ratings": {
+        "overall_sentiment": {
+          "score": 5,
+          "confidence": 3,
+          "notes": ""
+        },
+        "activity_breakdown": {
+          "score": 5,
+          "confidence": 4,
+          "notes": ""
+        },
+        "deal_momentum_indicators": {
+          "score": 5,
+          "confidence": 5,
+          "notes": ""
+        },
+        "reasoning": {
+          "score": 5,
+          "confidence": 3,
+          "notes": ""
+        },
+        "professional_gaps": {
+          "score": 5,
+          "confidence": 5,
+          "notes": ""
+        },
+        "excellence_indicators": {
+          "score": 5,
+          "confidence": 5,
+          "notes": ""
+        },
+        "risk_indicators": {
+          "score": 4,
+          "confidence": 5,
+          "notes": ""
+        },
+        "opportunity_indicators": {
+          "score": 4,
+          "confidence": 5,
+          "notes": ""
+        },
+        "temporal_trend": {
+          "score": 5,
+          "confidence": 5,
+          "notes": ""
+        },
+        "recommended_actions": {
+          "score": 5,
+          "confidence": 5,
+          "notes": ""
+        }
+      },
+      "time_spent_seconds": 135
+    }
+  },
+  "12692679344": {
+    "aman.jaiswar@glynac.ai": {
+      "user_email": "aman.jaiswar@glynac.ai",
+      "timestamp": "2025-07-05T18:39:41.962891",
+      "ratings": {
+        "overall_sentiment": {
+          "score": 4,
+          "confidence": 5,
+          "notes": ""
+        },
+        "activity_breakdown": {
+          "score": 5,
+          "confidence": 4,
+          "notes": ""
+        },
+        "deal_momentum_indicators": {
+          "score": 4,
+          "confidence": 2,
+          "notes": ""
+        },
+        "reasoning": {
+          "score": 4,
+          "confidence": 5,
+          "notes": ""
+        },
+        "professional_gaps": {
+          "score": 3,
+          "confidence": 5,
+          "notes": ""
+        },
+        "excellence_indicators": {
+          "score": 5,
+          "confidence": 4,
+          "notes": ""
+        },
+        "risk_indicators": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "opportunity_indicators": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "temporal_trend": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "recommended_actions": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        }
+      },
+      "time_spent_seconds": 63
+    }
   }
 }
