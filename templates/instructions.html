@@ -3,111 +3,273 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instructions - Sentiment Validation App</title>
+    <title>Instructions - Deal Validation App</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
 </head>
 <body>
     <div class="header">
         <div class="container">
-            <h1>Sentiment Validation Instructions</h1>
-            <div class="user-info">
-                Welcome, {{ user_email }}
+            <div class="header-content">
+                <h1>Welcome to Deal Validation</h1>
+                <div class="user-info">
+                    {{ user_email }}
+                </div>
             </div>
         </div>
     </div>
     
-    <div class="container">
+    <div class="container narrow">
         <div class="nav">
-            <div id="progress-info" class="progress-info">
-                Loading progress...
+            <div class="progress-info">
+                <span class="progress-badge">{{ progress.completed_count }} / {{ progress.total_deals }} Completed</span>
+                {% if progress.completed_count > 0 %}
+                <div class="progress-bar" style="width: 120px; display: inline-block; margin-left: 1rem;">
+                    <div class="progress-fill" style="width: {{ (progress.completed_count / progress.total_deals * 100) }}%;"></div>
+                </div>
+                {% endif %}
             </div>
             <div class="nav-buttons">
-                <a href="/logout" class="btn btn-secondary">Logout</a>
+                <a href="/logout" class="btn btn-secondary">🚪 Logout</a>
             </div>
         </div>
         
         {% if request.query_params.get('completed') %}
-        <div class="alert alert-success">
-            <h3>🎉 Congratulations!</h3>
-            <p>You have completed all available deals. Thank you for your contribution to improving our AI system!</p>
+        <div class="alert alert-success" style="text-align: center; padding: 2rem;">
+            <h3 style="margin-bottom: 1rem;">🎉 Congratulations!</h3>
+            <p style="font-size: 1.125rem;">You have completed all {{ progress.total_deals }} deals!</p>
+            <p>Thank you for your valuable contribution to improving our AI system.</p>
         </div>
         {% endif %}
         
-        <div class="instructions card">
-            <h2>📋 Your Task</h2>
-            <p>You will be evaluating AI-generated sentiment analysis of sales deals. Your job is to determine how accurate the AI's assessment is compared to what you observe in the actual deal activities.</p>
-            
-            <h2>🔍 What to Look For</h2>
-            <p>As you review each deal, pay attention to these key elements:</p>
-            
-            <ul>
-                <li><strong>Communication Patterns:</strong> How does the salesperson interact with the client? Are they proactive, responsive, professional?</li>
-                <li><strong>Deal Progression:</strong> Is the deal moving forward, stagnating, or regressing? Look for concrete signs of advancement.</li>
-                <li><strong>Client Engagement:</strong> How engaged is the client? Are they responding positively, asking questions, showing interest?</li>
-                <li><strong>Professional Standards:</strong> Remember that salespeople are trained professionals. Standard business communication should be considered neutral, not positive.</li>
-                <li><strong>Risk Indicators:</strong> Look for warning signs like delayed responses, avoided questions, or client hesitation.</li>
-                <li><strong>Opportunity Indicators:</strong> Identify positive signals like client enthusiasm, referrals, or expansion discussions.</li>
-            </ul>
-            
-            <h2>📊 Rating System</h2>
-            <p>You will rate each aspect of the AI's analysis on a scale of 1-5:</p>
-            
-            <ul>
-                <li><strong>5 - Excellent:</strong> The AI's analysis is spot-on and insightful</li>
-                <li><strong>4 - Good:</strong> The AI's analysis is mostly accurate with minor issues</li>
-                <li><strong>3 - Fair:</strong> The AI's analysis is somewhat accurate but has notable gaps</li>
-                <li><strong>2 - Poor:</strong> The AI's analysis has significant errors or misses important points</li>
-                <li><strong>1 - Very Poor:</strong> The AI's analysis is completely wrong or irrelevant</li>
-            </ul>
-            
-            <div class="highlight">
-                <strong>⚠️ Important:</strong> You will also rate your confidence level (1-5) for each assessment and can provide optional notes explaining your reasoning, especially when you disagree with the AI's analysis.
+        <div class="instructions">
+            <!-- Quick Start -->
+            <div class="card" style="background: linear-gradient(135deg, #f0f7ff 0%, #f8f0ff 100%); border: none;">
+                <h2 style="border: none; text-align: center; font-size: 2rem;">🚀 Quick Start Guide</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem; margin-top: 2rem;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">1️⃣</div>
+                        <h4>Review Activities</h4>
+                        <p style="color: var(--text-muted);">Read all deal communications chronologically</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">2️⃣</div>
+                        <h4>Analyze Patterns</h4>
+                        <p style="color: var(--text-muted);">Identify sentiment and behavioral trends</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">3️⃣</div>
+                        <h4>Rate AI Output</h4>
+                        <p style="color: var(--text-muted);">Evaluate accuracy of AI's analysis</p>
+                    </div>
+                </div>
             </div>
             
-            <h2>🔄 Process Flow</h2>
-            <ol>
-                <li><strong>Review Activities:</strong> Read through all deal activities in chronological order</li>
-                <li><strong>Analyze Patterns:</strong> Look for trends, sentiment shifts, and professional behavior</li>
-                <li><strong>Rate AI Output:</strong> Evaluate each section of the AI's analysis</li>
-                <li><strong>Provide Feedback:</strong> Add notes where you disagree or have additional insights</li>
-                <li><strong>Submit & Continue:</strong> Submit your ratings and move to the next deal</li>
-            </ol>
-            
-            <h2>📝 What You'll Rate</h2>
-            <p>For each deal, you'll evaluate these aspects of the AI's analysis:</p>
-            
-            <ul>
-                <li><strong>Overall Sentiment:</strong> The AI's overall assessment of the salesperson's sentiment</li>
-                <li><strong>Activity Breakdown:</strong> How well the AI analyzed different types of activities</li>
-                <li><strong>Deal Momentum:</strong> The AI's assessment of deal progression and trends</li>
-                <li><strong>Reasoning:</strong> The quality and accuracy of the AI's explanations</li>
-                <li><strong>Professional Gaps:</strong> How well the AI identified performance issues</li>
-                <li><strong>Excellence Indicators:</strong> The AI's recognition of exceptional performance</li>
-                <li><strong>Risk Indicators:</strong> The AI's identification of potential deal risks</li>
-                <li><strong>Opportunity Indicators:</strong> The AI's recognition of positive signals</li>
-                <li><strong>Temporal Trend:</strong> The AI's assessment of performance trends over time</li>
-                <li><strong>Recommended Actions:</strong> The quality and relevance of the AI's suggestions</li>
-            </ul>
-            
-            <h2>💡 Tips for Success</h2>
-            <ul>
-                <li>Take your time to read through all activities carefully</li>
-                <li>Look for patterns across multiple activities, not just individual messages</li>
-                <li>Consider the context of the deal stage and size</li>
-                <li>Remember that professional salespeople should meet high standards</li>
-                <li>When in doubt, provide detailed notes explaining your reasoning</li>
-                <li>You can always go back to review activities while rating</li>
-            </ul>
-            
-            <div class="highlight">
-                <strong>🎯 Your Goal:</strong> Help us improve our AI system by providing honest, thoughtful feedback. Your insights will directly contribute to better sales performance analysis.
+            <!-- Main Task -->
+            <div class="card">
+                <h2>📋 Your Task</h2>
+                <p style="font-size: 1.125rem; line-height: 1.8;">
+                    You'll evaluate how accurately our AI understands sales sentiment and behavior patterns. 
+                    Your expert assessment helps train better AI models for sales performance analysis.
+                </p>
+                
+                <div style="background: var(--bg-secondary); padding: 1.5rem; border-radius: 8px; margin-top: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem;">What Makes a Good Evaluation?</h4>
+                    <ul style="margin: 0;">
+                        <li><strong>Objectivity:</strong> Base ratings on what you observe, not assumptions</li>
+                        <li><strong>Consistency:</strong> Apply the same standards across all deals</li>
+                        <li><strong>Detail:</strong> Provide notes when you disagree with the AI</li>
+                        <li><strong>Context:</strong> Consider deal stage, size, and timeline</li>
+                    </ul>
+                </div>
             </div>
             
-            <div style="text-align: center; margin-top: 2rem;">
-                <a href="/start-annotation" class="btn btn-primary btn-lg">
+            <!-- What to Look For -->
+            <div class="card">
+                <h2>🔍 What to Analyze</h2>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+                    <div style="background: var(--bg-secondary); padding: 1.25rem; border-radius: 8px;">
+                        <h4 style="color: var(--primary-color); margin-bottom: 0.75rem;">
+                            💬 Communication Quality
+                        </h4>
+                        <ul style="margin: 0; font-size: 0.95rem;">
+                            <li>Response times</li>
+                            <li>Message clarity</li>
+                            <li>Professional tone</li>
+                            <li>Follow-up consistency</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="background: var(--bg-secondary); padding: 1.25rem; border-radius: 8px;">
+                        <h4 style="color: var(--success-color); margin-bottom: 0.75rem;">
+                            📈 Deal Progression
+                        </h4>
+                        <ul style="margin: 0; font-size: 0.95rem;">
+                            <li>Stage advancement</li>
+                            <li>Momentum changes</li>
+                            <li>Decision timeline</li>
+                            <li>Stakeholder engagement</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="background: var(--bg-secondary); padding: 1.25rem; border-radius: 8px;">
+                        <h4 style="color: var(--warning-color); margin-bottom: 0.75rem;">
+                            🎯 Client Signals
+                        </h4>
+                        <ul style="margin: 0; font-size: 0.95rem;">
+                            <li>Interest level</li>
+                            <li>Question quality</li>
+                            <li>Response enthusiasm</li>
+                            <li>Objection handling</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="background: var(--bg-secondary); padding: 1.25rem; border-radius: 8px;">
+                        <h4 style="color: var(--danger-color); margin-bottom: 0.75rem;">
+                            ⚠️ Risk Factors
+                        </h4>
+                        <ul style="margin: 0; font-size: 0.95rem;">
+                            <li>Delayed responses</li>
+                            <li>Avoided questions</li>
+                            <li>Competitive mentions</li>
+                            <li>Budget concerns</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Rating Scale -->
+            <div class="card">
+                <h2>📊 Rating System</h2>
+                
+                <div style="display: grid; gap: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                        <div style="font-size: 2rem;">⭐⭐⭐⭐⭐</div>
+                        <div>
+                            <strong style="color: var(--success-color);">5 - Excellent</strong>
+                            <p style="margin: 0; color: var(--text-muted);">AI's analysis is spot-on and insightful</p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                        <div style="font-size: 2rem;">⭐⭐⭐⭐</div>
+                        <div>
+                            <strong style="color: var(--success-color);">4 - Good</strong>
+                            <p style="margin: 0; color: var(--text-muted);">Mostly accurate with minor issues</p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                        <div style="font-size: 2rem;">⭐⭐⭐</div>
+                        <div>
+                            <strong style="color: var(--warning-color);">3 - Fair</strong>
+                            <p style="margin: 0; color: var(--text-muted);">Somewhat accurate but has notable gaps</p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                        <div style="font-size: 2rem;">⭐⭐</div>
+                        <div>
+                            <strong style="color: var(--danger-color);">2 - Poor</strong>
+                            <p style="margin: 0; color: var(--text-muted);">Significant errors or misses important points</p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                        <div style="font-size: 2rem;">⭐</div>
+                        <div>
+                            <strong style="color: var(--danger-color);">1 - Very Poor</strong>
+                            <p style="margin: 0; color: var(--text-muted);">Completely wrong or irrelevant</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="highlight" style="margin-top: 1.5rem;">
+                    <strong>💡 Remember:</strong> You're also rating your confidence level (1-5) for each assessment. 
+                    This helps us understand when the AI's analysis is particularly clear or confusing.
+                </div>
+            </div>
+            
+            <!-- Process Flow -->
+            <div class="card">
+                <h2>🔄 Process Overview</h2>
+                
+                <ol style="font-size: 1.0625rem; line-height: 2;">
+                    <li><strong>Click "Start Reviewing Deals"</strong> below to begin</li>
+                    <li><strong>Read all activities</strong> for the deal (emails, calls, meetings, notes)</li>
+                    <li><strong>Form your opinion</strong> about the salesperson's performance</li>
+                    <li><strong>Click "Rate AI Analysis"</strong> when ready</li>
+                    <li><strong>Evaluate each section</strong> of the AI's analysis (10 sections total)</li>
+                    <li><strong>Add notes</strong> where you disagree or have insights</li>
+                    <li><strong>Submit and continue</strong> to the next deal</li>
+                </ol>
+                
+                <div style="background: #e0f2fe; padding: 1.25rem; border-radius: 8px; margin-top: 1.5rem;">
+                    <h4 style="color: #0369a1; margin-bottom: 0.5rem;">⏱️ Time Expectation</h4>
+                    <p style="margin: 0; color: #0c4a6e;">
+                        Each deal typically takes 10-20 minutes to review thoroughly. 
+                        Your work is automatically saved as you go.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Tips -->
+            <div class="card">
+                <h2>💡 Pro Tips</h2>
+                
+                <div style="display: grid; gap: 1rem;">
+                    <div style="display: flex; gap: 1rem;">
+                        <span style="font-size: 1.5rem;">📌</span>
+                        <div>
+                            <strong>Context Matters:</strong> Consider deal size, industry, and timeline when evaluating
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <span style="font-size: 1.5rem;">🎯</span>
+                        <div>
+                            <strong>Stay Objective:</strong> Focus on observable behaviors, not interpretations
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <span style="font-size: 1.5rem;">💬</span>
+                        <div>
+                            <strong>Use Notes:</strong> Explain your reasoning when you strongly agree or disagree
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <span style="font-size: 1.5rem;">⚡</span>
+                        <div>
+                            <strong>Keyboard Shortcuts:</strong> Ctrl+S saves draft, Ctrl+Enter submits rating
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 1rem;">
+                        <span style="font-size: 1.5rem;">💾</span>
+                        <div>
+                            <strong>Auto-Save:</strong> Your progress saves automatically every 30 seconds
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CTA -->
+            <div class="card text-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+                <h2 style="color: white; border: none;">🎯 Ready to Start?</h2>
+                <p style="font-size: 1.125rem; margin-bottom: 2rem;">
+                    Help us build better AI for sales teams everywhere
+                </p>
+                {% if progress.completed_count < progress.total_deals %}
+                <a href="/start-annotation" class="btn btn-lg" style="background: white; color: var(--primary-color); font-size: 1.25rem; padding: 1rem 3rem;">
                     Start Reviewing Deals
                 </a>
+                <p style="margin-top: 1rem; opacity: 0.9;">
+                    {{ progress.total_deals - progress.completed_count }} deals remaining
+                </p>
+                {% else %}
+                <p style="font-size: 1.25rem;">
+                    ✅ All deals completed!
+                </p>
+                {% endif %}
             </div>
         </div>
     </div>

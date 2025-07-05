@@ -3,20 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Sentiment Validation App - Login</title>
+    <title>Deal Validation App - Login</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
 </head>
-<body>
+<body style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center;">
     <div class="container">
-        <div class="login-form">
-            <h2>Deal Validation App</h2>
-            <p style="text-align: center; color: #6c757d; margin-bottom: 2rem;">
-                Sign in with your authorized email address
-            </p>
+        <div class="login-form" style="max-width: 450px;">
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">📊</div>
+                <h2 style="font-size: 2rem; margin-bottom: 0.5rem;">Deal Validation App</h2>
+                <p style="color: var(--text-muted); font-size: 1.125rem;">
+                    AI Sentiment Analysis Evaluation System
+                </p>
+            </div>
             
             {% if error %}
-            <div class="alert alert-danger">
+            <div class="alert alert-danger" style="margin-bottom: 1.5rem;">
                 {{ error }}
             </div>
             {% endif %}
@@ -29,27 +32,81 @@
                         id="email" 
                         name="email" 
                         class="form-control" 
-                        placeholder="Enter your email address"
+                        placeholder="your.email@company.com"
                         required
                         autocomplete="email"
+                        autofocus
+                        style="font-size: 1rem;"
                     >
+                    <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">
+                        Use your authorized company email address
+                    </small>
                 </div>
                 
-                <button type="submit" class="btn btn-primary" style="width: 100%;">
-                    Sign In
+                <button type="submit" class="btn btn-primary" style="width: 100%; font-size: 1.125rem; padding: 0.875rem;">
+                    Sign In →
                 </button>
             </form>
             
-            <div style="text-align: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e9ecef;">
-                <p style="color: #6c757d; font-size: 0.9rem;">
+            <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                <div style="text-align: center;">
+                    <h4 style="color: var(--text-secondary); font-weight: 500; margin-bottom: 1rem;">
+                        What You'll Do
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">
+                        <div>
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📋</div>
+                            <small style="color: var(--text-muted);">Review Deals</small>
+                        </div>
+                        <div>
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🤖</div>
+                            <small style="color: var(--text-muted);">Evaluate AI</small>
+                        </div>
+                        <div>
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">⭐</div>
+                            <small style="color: var(--text-muted);">Rate Analysis</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 2rem;">
+                <p style="color: var(--text-muted); font-size: 0.875rem;">
                     Need access? Contact your administrator
                 </p>
-                <a href="/admin" style="color: #007bff; text-decoration: none; font-size: 0.9rem;">
-                    Admin Login
+                <a href="/admin" style="color: var(--primary-color); text-decoration: none; font-size: 0.875rem;">
+                    Admin Login →
                 </a>
             </div>
         </div>
     </div>
+    
+    <style>
+        /* Login page specific styles */
+        .login-form {
+            animation: fadeInUp 0.5s ease;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .form-control:focus {
+            transform: translateY(-1px);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+        }
+    </style>
     
     <script src="/static/js/app.js"></script>
 </body>

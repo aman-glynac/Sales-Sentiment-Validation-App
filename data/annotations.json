@@ -1,1 +1,120 @@
-{}
+{
+  "12690973853": {
+    "aman.jaiswar@glynac.ai": {
+      "user_email": "aman.jaiswar@glynac.ai",
+      "timestamp": "2025-07-04T18:02:57.767487",
+      "ratings": {
+        "overall_sentiment": {
+          "score": 5,
+          "confidence": 4,
+          "notes": ""
+        },
+        "activity_breakdown": {
+          "score": 5,
+          "confidence": 4,
+          "notes": ""
+        },
+        "deal_momentum_indicators": {
+          "score": 5,
+          "confidence": 5,
+          "notes": ""
+        },
+        "reasoning": {
+          "score": 5,
+          "confidence": 5,
+          "notes": ""
+        },
+        "professional_gaps": {
+          "score": 5,
+          "confidence": 5,
+          "notes": ""
+        },
+        "excellence_indicators": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "risk_indicators": {
+          "score": 5,
+          "confidence": 5,
+          "notes": ""
+        },
+        "opportunity_indicators": {
+          "score": 5,
+          "confidence": 5,
+          "notes": ""
+        },
+        "temporal_trend": {
+          "score": 5,
+          "confidence": 5,
+          "notes": ""
+        },
+        "recommended_actions": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        }
+      },
+      "time_spent_seconds": 777
+    }
+  },
+  "12692541273": {
+    "aman.jaiswar@glynac.ai": {
+      "user_email": "aman.jaiswar@glynac.ai",
+      "timestamp": "2025-07-05T12:24:12.959576",
+      "ratings": {
+        "overall_sentiment": {
+          "score": 4,
+          "confidence": 5,
+          "notes": ""
+        },
+        "activity_breakdown": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "deal_momentum_indicators": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "reasoning": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "professional_gaps": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "excellence_indicators": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "risk_indicators": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "opportunity_indicators": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "temporal_trend": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        },
+        "recommended_actions": {
+          "score": 4,
+          "confidence": 4,
+          "notes": ""
+        }
+      },
+      "time_spent_seconds": 52
+    }
+  }
+}
