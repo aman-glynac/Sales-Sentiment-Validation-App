@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Deal Validation App</title>
+    <title>Admin Dashboard - Sales Sentiment Validation App</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
 </head>
@@ -13,7 +13,7 @@
             <div class="header-content">
                 <h1>Admin Dashboard</h1>
                 <div class="user-info">
-                    Deal Validation Management System
+                    Sales Sentiment Validation Management System
                 </div>
             </div>
         </div>
@@ -262,6 +262,41 @@
                             🏥 Health Check
                         </button>
                     </div>
+                </div>
+            </div>
+
+            <!-- Add this section after the existing System Overview section -->
+            <div class="admin-section">
+                <h2>📊 Deal Distribution</h2>
+                
+                <div style="background: var(--bg-secondary); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+                    <h3 style="font-size: 1.125rem; margin-bottom: 1rem;">Target: {{ target_annotations_per_deal }} annotations per deal</h3>
+                    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+                        <div class="stat-card">
+                            <div class="stat-number" id="completed-deals-stat">{{ completed_deals }}</div>
+                            <div class="stat-label">Deals Completed</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="total-deals-stat">{{ total_deals }}</div>
+                            <div class="stat-label">Total Deals</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="completion-percentage">
+                                {% if total_deals > 0 %}{{ ((completed_deals / total_deals * 100) | round(1)) }}{% else %}0{% endif %}%
+                            </div>
+                            <div class="stat-label">Completion Rate</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-bottom: 1rem;">
+                    <button onclick="loadDealDistribution()" class="btn btn-primary">
+                        📈 View Detailed Distribution
+                    </button>
+                </div>
+                
+                <div id="deal-distribution-details" style="display: none; margin-top: 1.5rem;">
+                    <!-- Distribution details will be loaded here -->
                 </div>
             </div>
         </div>

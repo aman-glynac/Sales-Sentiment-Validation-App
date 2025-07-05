@@ -519,7 +519,7 @@ class DealValidationApp {
                 if (element) {
                     element.innerHTML = `
                         <span class="progress-badge">
-                            ${progress.completed_count} / ${progress.total_deals} Completed
+                            ${progress.completed_count} Completed
                         </span>
                     `;
                 }
@@ -721,7 +721,74 @@ class AdminDashboard {
         const app = window.dealValidationApp || new DealValidationApp();
         app.showAlert(message, type);
     }
+
+    async loadDealDistribution() {
+        try {
+            const response = await fetch('/api/admin/deal-distribution');
+            if (!response.ok) return;
+            
+            const data = await response.json();
+            this.displayDealDistribution(data);
+        } catch (error) {
+            console.error('Failed to load deal distribution:', error);
+        }
+    }
+
+    displayDealDistribution(data) {
+        const container = document.getElementById('deal-distribution-details');
+        if (!container) return;
+        
+        let html = `
+            <div style="background: var(--bg-secondary); padding: 1.5rem; border-radius: 8px;">
+                <h4>Deal-by-Deal Progress (First 20 deals shown)</h4>
+                <div style="max-height: 400px; overflow-y: auto; margin-top: 1rem;">
+        `;
+        
+        // Show first 20 deals for performance
+        const dealsToShow = data.deal_details.slice(0, 20);
+        
+        dealsToShow.forEach(deal => {
+            const statusColor = deal.status === 'completed' ? 'var(--success-color)' : 
+                            deal.status === 'in_progress' ? 'var(--warning-color)' : 'var(--text-muted)';
+            
+            html += `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; border-bottom: 1px solid var(--border-color);">
+                    <div>
+                        <strong>Deal #${deal.deal_id}</strong>
+                        <span style="margin-left: 1rem; color: ${statusColor};">
+                            ${deal.current_annotations}/${deal.target_annotations} annotations
+                        </span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <div class="progress-bar" style="width: 120px;">
+                            <div class="progress-fill" style="width: ${deal.progress_percentage}%;"></div>
+                        </div>
+                        <span style="font-weight: 600;">${deal.progress_percentage.toFixed(1)}%</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+                <div style="margin-top: 1rem; text-align: center; color: var(--text-muted);">
+                    Showing ${dealsToShow.length} of ${data.total_deals} deals
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        container.style.display = 'block';
+    }
 }
+
+// Move this outside the class and after the class definition
+window.loadDealDistribution = function() {
+    const adminDashboard = window.adminDashboard;
+    if (adminDashboard) {
+        adminDashboard.loadDealDistribution();
+    }
+};
 
 // Initialize appropriate class based on page
 document.addEventListener('DOMContentLoaded', () => {
@@ -905,3 +972,4 @@ if ('serviceWorker' in navigator) {
             });
     });
 }
+

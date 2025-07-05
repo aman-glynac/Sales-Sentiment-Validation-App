@@ -33,6 +33,9 @@ DEALS_FILE = os.getenv("DEALS_FILE", "./data/deals.json")
 LLM_OUTPUTS_FILE = os.getenv("LLM_OUTPUTS_FILE", "./data/llm_outputs.json")
 ANNOTATIONS_FILE = os.getenv("ANNOTATIONS_FILE", "./data/annotations.json")
 
+# Add this constant at the top after other constants
+TARGET_ANNOTATIONS_PER_DEAL = 20  # Make this configurable
+
 # Cache for loaded data
 data_cache = {}
 cache_timestamp = {}
@@ -126,36 +129,75 @@ def invalidate_cache(file_path: str = None):
         data_cache.clear()
         cache_timestamp.clear()
 
+def get_deal_annotation_counts(annotations: Dict) -> Dict[str, int]:
+    """Get count of unique annotators for each deal"""
+    deal_counts = {}
+    for deal_id, deal_annotations in annotations.items():
+        deal_counts[deal_id] = len(deal_annotations.keys())
+    return deal_counts
+
+def get_next_deal_for_user(email: str) -> Optional[str]:
+    """Get next deal ID for user to annotate with intelligent distribution"""
+    deals = load_json_file(DEALS_FILE)
+    annotations = load_json_file(ANNOTATIONS_FILE)
+    
+    # Get deals this user has already completed
+    user_completed_deals = set()
+    for deal_id, deal_annotations in annotations.items():
+        if email in deal_annotations:
+            user_completed_deals.add(str(deal_id))
+    
+    # Get annotation counts for all deals
+    deal_counts = get_deal_annotation_counts(annotations)
+    
+    # Create list of available deals for this user with their current annotation counts
+    available_deals = []
+    for deal_id in deals.keys():
+        deal_id = str(deal_id)
+        if deal_id not in user_completed_deals:
+            current_count = deal_counts.get(deal_id, 0)
+            if current_count < TARGET_ANNOTATIONS_PER_DEAL:
+                available_deals.append((deal_id, current_count))
+    
+    if not available_deals:
+        return None
+    
+    # Sort by annotation count (ascending) to prioritize deals with fewer annotations
+    # Then by deal_id for consistent ordering when counts are equal
+    available_deals.sort(key=lambda x: (x[1], x[0]))
+    
+    # Return the deal with the lowest annotation count
+    return available_deals[0][0]
+
 def get_user_progress(email: str) -> Dict:
-    """Get user's annotation progress"""
+    """Get user's annotation progress with updated logic"""
     annotations = load_json_file(ANNOTATIONS_FILE)
     deals = load_json_file(DEALS_FILE)
-    completed_deals = []
     
+    # Get deals this user has completed
+    completed_deals = []
     for deal_id, deal_annotations in annotations.items():
         if email in deal_annotations:
             completed_deals.append(deal_id)
     
+    # Calculate total possible deals for this user
+    # This is the number of deals that still need annotations
+    deal_counts = get_deal_annotation_counts(annotations)
+    available_deals_for_user = 0
+    
+    for deal_id in deals.keys():
+        deal_id = str(deal_id)
+        current_count = deal_counts.get(deal_id, 0)
+        if current_count < TARGET_ANNOTATIONS_PER_DEAL and deal_id not in completed_deals:
+            available_deals_for_user += 1
+    
+    total_possible_for_user = len(completed_deals) + available_deals_for_user
+    
     return {
         "completed_count": len(completed_deals),
-        "total_deals": len(deals),
+        "total_deals": total_possible_for_user,
         "completed_deals": completed_deals
     }
-
-def get_next_deal_for_user(email: str) -> Optional[str]:
-    """Get next deal ID for user to annotate"""
-    deals = load_json_file(DEALS_FILE)
-    progress = get_user_progress(email)
-    
-    # Convert all deal IDs to strings for consistent comparison
-    all_deal_ids = [str(deal_id) for deal_id in deals.keys()]
-    completed_deal_ids = [str(deal_id) for deal_id in progress["completed_deals"]]
-    
-    for deal_id in all_deal_ids:
-        if deal_id not in completed_deal_ids:
-            return deal_id
-    
-    return None
 
 def sort_activities_chronologically(activities: List[Dict]) -> List[Dict]:
     """Sort activities by timestamp"""
@@ -201,16 +243,22 @@ def get_admin_dashboard_context(request: Request, authenticated: bool = True):
             "email": user["email"],
             "name": user["name"],
             "completed_count": progress["completed_count"],
-            "total_deals": len(deals),
+            "total_deals": progress["total_deals"],  # This is now user-specific
             "is_admin": user.get("is_admin", False)
         })
         total_annotations += progress["completed_count"]
+    
+    # Calculate deal distribution stats
+    deal_counts = get_deal_annotation_counts(annotations)
+    completed_deals = sum(1 for count in deal_counts.values() if count >= TARGET_ANNOTATIONS_PER_DEAL)
     
     return {
         "request": request,
         "users": user_progress,
         "total_deals": len(deals),
         "total_annotations": total_annotations,
+        "completed_deals": completed_deals,
+        "target_annotations_per_deal": TARGET_ANNOTATIONS_PER_DEAL,
         "authenticated": True
     }
 
@@ -272,6 +320,52 @@ async def start_annotation(current_user: str = Depends(get_current_user)):
         return RedirectResponse(url="/instructions?completed=true", status_code=302)
     
     return RedirectResponse(url=f"/activities/{next_deal}", status_code=302)
+
+@app.get("/api/admin/deal-distribution")
+async def get_deal_distribution(admin_token: Optional[str] = Cookie(None)):
+    """Get deal annotation distribution for admin monitoring"""
+    if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    deals = load_json_file(DEALS_FILE)
+    annotations = load_json_file(ANNOTATIONS_FILE)
+    deal_counts = get_deal_annotation_counts(annotations)
+    
+    distribution_stats = {
+        "target_per_deal": TARGET_ANNOTATIONS_PER_DEAL,
+        "total_deals": len(deals),
+        "completed_deals": 0,
+        "in_progress_deals": 0,
+        "not_started_deals": 0,
+        "deal_details": []
+    }
+    
+    for deal_id in deals.keys():
+        deal_id = str(deal_id)
+        current_count = deal_counts.get(deal_id, 0)
+        
+        status = "not_started"
+        if current_count >= TARGET_ANNOTATIONS_PER_DEAL:
+            status = "completed"
+            distribution_stats["completed_deals"] += 1
+        elif current_count > 0:
+            status = "in_progress"
+            distribution_stats["in_progress_deals"] += 1
+        else:
+            distribution_stats["not_started_deals"] += 1
+        
+        distribution_stats["deal_details"].append({
+            "deal_id": deal_id,
+            "current_annotations": current_count,
+            "target_annotations": TARGET_ANNOTATIONS_PER_DEAL,
+            "status": status,
+            "progress_percentage": (current_count / TARGET_ANNOTATIONS_PER_DEAL * 100) if TARGET_ANNOTATIONS_PER_DEAL > 0 else 0
+        })
+    
+    # Sort by progress (lowest first to show which deals need attention)
+    distribution_stats["deal_details"].sort(key=lambda x: x["current_annotations"])
+    
+    return distribution_stats
 
 @app.get("/activities/{deal_id}", response_class=HTMLResponse)
 async def view_activities(request: Request, deal_id: str, current_user: str = Depends(get_current_user)):
@@ -578,10 +672,13 @@ async def get_admin_stats(request: Request, admin_token: Optional[str] = Cookie(
     annotations = load_json_file(ANNOTATIONS_FILE)
     deals = load_json_file(DEALS_FILE)
     
-    # Calculate statistics
+    # Calculate statistics with new logic
     total_users = len(users_data.get("users", []))
     total_deals = len(deals)
     total_annotations = sum(len(deal_annots) for deal_annots in annotations.values())
+    
+    # Calculate target total annotations (deals * target per deal)
+    target_total_annotations = total_deals * TARGET_ANNOTATIONS_PER_DEAL
     
     # User completion stats
     completion_stats = []
@@ -590,14 +687,15 @@ async def get_admin_stats(request: Request, admin_token: Optional[str] = Cookie(
         completion_stats.append({
             "email": user["email"],
             "completed": progress["completed_count"],
-            "percentage": (progress["completed_count"] / total_deals * 100) if total_deals > 0 else 0
+            "percentage": (progress["completed_count"] / progress["total_deals"] * 100) if progress["total_deals"] > 0 else 0
         })
     
     return {
         "total_users": total_users,
         "total_deals": total_deals,
         "total_annotations": total_annotations,
-        "overall_progress": (total_annotations / (total_users * total_deals) * 100) if total_users and total_deals else 0,
+        "target_total_annotations": target_total_annotations,
+        "overall_progress": (total_annotations / target_total_annotations * 100) if target_total_annotations > 0 else 0,
         "user_stats": completion_stats
     }
 

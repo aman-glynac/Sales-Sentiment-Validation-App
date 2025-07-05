@@ -22,12 +22,7 @@
     <div class="container narrow">
         <div class="nav">
             <div class="progress-info">
-                <span class="progress-badge">{{ progress.completed_count }} / {{ progress.total_deals }} Completed</span>
-                {% if progress.completed_count > 0 %}
-                <div class="progress-bar" style="width: 120px; display: inline-block; margin-left: 1rem;">
-                    <div class="progress-fill" style="width: {{ (progress.completed_count / progress.total_deals * 100) }}%;"></div>
-                </div>
-                {% endif %}
+                <span class="progress-badge">{{ progress.completed_count }} Deals Completed</span>
             </div>
             <div class="nav-buttons">
                 <a href="/logout" class="btn btn-secondary">🚪 Logout</a>
@@ -37,10 +32,24 @@
         {% if request.query_params.get('completed') %}
         <div class="alert alert-success" style="text-align: center; padding: 2rem;">
             <h3 style="margin-bottom: 1rem;">🎉 Congratulations!</h3>
-            <p style="font-size: 1.125rem;">You have completed all {{ progress.total_deals }} deals!</p>
+            <p style="font-size: 1.125rem;">You have completed all available deals assigned to you!</p>
             <p>Thank you for your valuable contribution to improving our AI system.</p>
         </div>
         {% endif %}
+
+        <!-- Critical Instruction Alert -->
+        <div class="alert" style="background: linear-gradient(135deg, #fee2e2 0%, #fef3c7 100%); border: 2px solid #f59e0b; margin-bottom: 2rem;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div style="font-size: 3rem;">⚠️</div>
+                <div>
+                    <h3 style="color: #dc2626; margin-bottom: 0.5rem;">IMPORTANT: What You're Evaluating</h3>
+                    <p style="color: #7c2d12; font-weight: 500; margin: 0; font-size: 1.125rem;">
+                        You are evaluating the <strong>AI's analysis accuracy</strong> - NOT the salesperson's performance! 
+                        Your job is to rate how well the AI understood and analyzed the deal activities.
+                    </p>
+                </div>
+            </div>
+        </div>
         
         <div class="instructions">
             <!-- Quick Start -->
@@ -54,13 +63,13 @@
                     </div>
                     <div style="text-align: center;">
                         <div style="font-size: 3rem; margin-bottom: 1rem;">2️⃣</div>
-                        <h4>Analyze Patterns</h4>
-                        <p style="color: var(--text-muted);">Identify sentiment and behavioral trends</p>
+                        <h4>Form Your Opinion</h4>
+                        <p style="color: var(--text-muted);">Understand what actually happened in the deal</p>
                     </div>
                     <div style="text-align: center;">
                         <div style="font-size: 3rem; margin-bottom: 1rem;">3️⃣</div>
-                        <h4>Rate AI Output</h4>
-                        <p style="color: var(--text-muted);">Evaluate accuracy of AI's analysis</p>
+                        <h4>Rate AI Analysis</h4>
+                        <p style="color: var(--text-muted);">Evaluate how accurately AI analyzed the deal</p>
                     </div>
                 </div>
             </div>
@@ -72,6 +81,14 @@
                     You'll evaluate how accurately our AI understands sales sentiment and behavior patterns. 
                     Your expert assessment helps train better AI models for sales performance analysis.
                 </p>
+
+                <div style="background: #fef3c7; padding: 1.5rem; border-radius: 8px; margin: 1.5rem 0; border-left: 4px solid #f59e0b;">
+                    <h4 style="color: #92400e; margin-bottom: 1rem;">🎯 Key Point: AI Analysis Evaluation</h4>
+                    <p style="color: #78350f; margin: 0; font-weight: 500;">
+                        You are <strong>NOT</strong> rating the salesperson's performance. You are rating how well the AI 
+                        understood and analyzed what happened in the deal. Focus on the AI's accuracy, not the sales quality.
+                    </p>
+                </div>
                 
                 <div style="background: var(--bg-secondary); padding: 1.5rem; border-radius: 8px; margin-top: 1.5rem;">
                     <h4 style="margin-bottom: 1rem;">What Makes a Good Evaluation?</h4>
@@ -198,10 +215,10 @@
                 <ol style="font-size: 1.0625rem; line-height: 2;">
                     <li><strong>Click "Start Reviewing Deals"</strong> below to begin</li>
                     <li><strong>Read all activities</strong> for the deal (emails, calls, meetings, notes)</li>
-                    <li><strong>Form your opinion</strong> about the salesperson's performance</li>
+                    <li><strong>Form your opinion</strong> about what actually happened in the deal</li>
                     <li><strong>Click "Rate AI Analysis"</strong> when ready</li>
-                    <li><strong>Evaluate each section</strong> of the AI's analysis (10 sections total)</li>
-                    <li><strong>Add notes</strong> where you disagree or have insights</li>
+                    <li><strong>Compare AI's analysis</strong> with your understanding (10 sections total)</li>
+                    <li><strong>Rate accuracy</strong> and add notes where AI got it wrong or right</li>
                     <li><strong>Submit and continue</strong> to the next deal</li>
                 </ol>
                 
@@ -219,6 +236,12 @@
                 <h2>💡 Pro Tips</h2>
                 
                 <div style="display: grid; gap: 1rem;">
+                    <div style="display: flex; gap: 1rem;">
+                        <span style="font-size: 1.5rem;">🤖</span>
+                        <div>
+                            <strong>Focus on AI Accuracy:</strong> Rate how well the AI captured what really happened
+                        </div>
+                    </div>
                     <div style="display: flex; gap: 1rem;">
                         <span style="font-size: 1.5rem;">📌</span>
                         <div>
@@ -258,16 +281,16 @@
                 <p style="font-size: 1.125rem; margin-bottom: 2rem;">
                     Help us build better AI for sales teams everywhere
                 </p>
-                {% if progress.completed_count < progress.total_deals %}
+                {% if progress.total_deals > 0 and progress.completed_count < progress.total_deals %}
                 <a href="/start-annotation" class="btn btn-lg" style="background: white; color: var(--primary-color); font-size: 1.25rem; padding: 1rem 3rem;">
                     Start Reviewing Deals
                 </a>
                 <p style="margin-top: 1rem; opacity: 0.9;">
-                    {{ progress.total_deals - progress.completed_count }} deals remaining
+                    Continue contributing to AI training
                 </p>
                 {% else %}
                 <p style="font-size: 1.25rem;">
-                    ✅ All deals completed!
+                    ✅ All assigned deals completed!
                 </p>
                 {% endif %}
             </div>
