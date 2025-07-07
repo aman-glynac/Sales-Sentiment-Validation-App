@@ -10,7 +10,7 @@ load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_HOURS = 24
+ACCESS_TOKEN_EXPIRE_HOURS = 1
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Create JWT access token"""
