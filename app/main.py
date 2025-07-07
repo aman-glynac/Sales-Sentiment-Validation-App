@@ -8,9 +8,9 @@ import os
 from typing import Optional, Dict, List, Any
 from dotenv import load_dotenv
 
-from models import *
-from auth import *
-from github_utils import GitHubManager
+from .models import *
+from .auth import *
+from .github_utils import GitHubManager
 
 # Load environment variables
 load_dotenv()
