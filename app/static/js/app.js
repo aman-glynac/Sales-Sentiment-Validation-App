@@ -4,8 +4,6 @@ class DealValidationApp {
     constructor() {
         this.startTime = Date.now();
         this.currentDealId = null;
-        this.ratings = {};
-        this.autoSaveInterval = null;
         this.init();
     }
 
@@ -51,25 +49,12 @@ class DealValidationApp {
         // Rating star interactions
         this.initRatingStars();
         
-        // Auto-save functionality
-        this.initAutoSave();
-
-        // Activity content expansion
-        // this.initActivityExpansion();
-
         // Keyboard shortcuts
         this.initKeyboardShortcuts();
     }
 
     initKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + S to save draft
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                e.preventDefault();
-                this.saveToLocalStorage();
-                this.showNotification('Draft saved', 'success');
-            }
-            
             // Ctrl/Cmd + Enter to submit
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                 const submitBtn = document.getElementById('submit-rating');
@@ -79,44 +64,6 @@ class DealValidationApp {
             }
         });
     }
-
-    // initActivityExpansion() {
-    //     const activities = document.querySelectorAll('.activity-content .body');
-    //     activities.forEach(activity => {
-    //         const content = activity.textContent || '';
-    //         if (content.length > 500) {
-    //             const truncated = content.substring(0, 500) + '...';
-    //             const fullContent = content;
-                
-    //             activity.innerHTML = `
-    //                 <span class="truncated-content">${this.escapeHtml(truncated)}</span>
-    //                 <span class="full-content" style="display: none;">${this.escapeHtml(fullContent)}</span>
-    //                 <button class="btn btn-sm btn-secondary expand-btn" style="margin-top: 0.5rem;">
-    //                     Show More
-    //                 </button>
-    //             `;
-                
-    //             const expandBtn = activity.querySelector('.expand-btn');
-    //             expandBtn.addEventListener('click', () => this.toggleContent(activity));
-    //         }
-    //     });
-    // }
-
-    // toggleContent(container) {
-    //     const truncated = container.querySelector('.truncated-content');
-    //     const full = container.querySelector('.full-content');
-    //     const btn = container.querySelector('.expand-btn');
-        
-    //     if (truncated.style.display === 'none') {
-    //         truncated.style.display = 'inline';
-    //         full.style.display = 'none';
-    //         btn.textContent = 'Show More';
-    //     } else {
-    //         truncated.style.display = 'none';
-    //         full.style.display = 'inline';
-    //         btn.textContent = 'Show Less';
-    //     }
-    // }
 
     escapeHtml(text) {
         const map = {
@@ -190,7 +137,6 @@ class DealValidationApp {
                         }, 300);
                     }
                     
-                    this.updateRating(e.target.name, e.target.value);
                     // Call the global function instead of this method
                     if (typeof updateSectionProgress === 'function') {
                         updateSectionProgress();
@@ -207,179 +153,6 @@ class DealValidationApp {
                 updateStarDisplay(0, false);
             }
         });
-    }
-
-    initAutoSave() {
-        // Auto-save every 30 seconds
-        this.autoSaveInterval = setInterval(() => {
-            this.saveToLocalStorage();
-        }, 30000);
-
-        // Save on text input
-        const textareas = document.querySelectorAll('textarea');
-        textareas.forEach(textarea => {
-            textarea.addEventListener('input', (e) => {
-                // Debounce auto-save
-                clearTimeout(this.saveTimeout);
-                this.saveTimeout = setTimeout(() => {
-                    this.saveToLocalStorage();
-                }, 2000);
-            });
-        });
-
-        // Load saved data on page load
-        this.loadFromLocalStorage();
-
-        // Save before unload
-        window.addEventListener('beforeunload', () => {
-            this.saveToLocalStorage();
-        });
-    }
-
-    updateRating(fieldName, value) {
-        if (!this.ratings[fieldName]) {
-            this.ratings[fieldName] = {};
-        }
-        this.ratings[fieldName] = parseInt(value);
-        
-        // Visual feedback
-        this.showNotification('Rating updated', 'info', 1000);
-    }
-
-    saveToLocalStorage() {
-        const dealId = this.getCurrentDealId();
-        if (!dealId) return;
-        
-        const formData = this.collectFormData();
-        const savedData = {
-            ...formData,
-            savedAt: new Date().toISOString()
-        };
-        
-        try {
-            localStorage.setItem(`deal_${dealId}_draft`, JSON.stringify(savedData));
-            console.log('Draft saved successfully');
-        } catch (e) {
-            console.error('Failed to save draft:', e);
-        }
-    }
-
-    loadFromLocalStorage() {
-        const dealId = this.getCurrentDealId();
-        if (!dealId) return;
-        
-        try {
-            const savedData = localStorage.getItem(`deal_${dealId}_draft`);
-            if (savedData) {
-                const data = JSON.parse(savedData);
-                this.populateForm(data);
-                
-                // Show when draft was saved
-                if (data.savedAt) {
-                    const savedDate = new Date(data.savedAt);
-                    const timeAgo = this.getTimeAgo(savedDate);
-                    this.showNotification(`Draft loaded (saved ${timeAgo})`, 'info');
-                }
-            }
-        } catch (e) {
-            console.error('Failed to load draft:', e);
-        }
-    }
-
-    getTimeAgo(date) {
-        const seconds = Math.floor((new Date() - date) / 1000);
-        
-        const intervals = {
-            year: 31536000,
-            month: 2592000,
-            week: 604800,
-            day: 86400,
-            hour: 3600,
-            minute: 60
-        };
-        
-        for (const [unit, secondsInUnit] of Object.entries(intervals)) {
-            const interval = Math.floor(seconds / secondsInUnit);
-            if (interval >= 1) {
-                return `${interval} ${unit}${interval === 1 ? '' : 's'} ago`;
-            }
-        }
-        
-        return 'just now';
-    }
-
-    populateForm(formData) {
-        // Populate ratings
-        Object.keys(formData.ratings || {}).forEach(fieldName => {
-            const rating = formData.ratings[fieldName];
-            
-            // Set score
-            if (rating.score) {
-                const scoreInput = document.querySelector(`input[name="${fieldName}_score"][value="${rating.score}"]`);
-                if (scoreInput) {
-                    scoreInput.checked = true;
-                    // Update star display
-                    const labels = scoreInput.closest('.rating-stars').querySelectorAll('label');
-                    labels.forEach((label, index) => {
-                        label.style.color = index < rating.score ? '#f59e0b' : '#e2e8f0';
-                    });
-                }
-            }
-            
-            // Set confidence
-            if (rating.confidence) {
-                const confidenceInput = document.querySelector(`input[name="${fieldName}_confidence"][value="${rating.confidence}"]`);
-                if (confidenceInput) {
-                    confidenceInput.checked = true;
-                    // Update star display
-                    const labels = confidenceInput.closest('.rating-stars').querySelectorAll('label');
-                    labels.forEach((label, index) => {
-                        label.style.color = index < rating.confidence ? '#f59e0b' : '#e2e8f0';
-                    });
-                }
-            }
-            
-            // Set notes
-            if (rating.notes) {
-                const notesTextarea = document.querySelector(`textarea[name="${fieldName}_notes"]`);
-                if (notesTextarea) {
-                    notesTextarea.value = rating.notes;
-                }
-            }
-        });
-        
-        // Update progress after loading
-        if (typeof updateSectionProgress === 'function') {
-            updateSectionProgress();
-        }
-    }
-
-    collectFormData() {
-        const formData = new FormData(document.getElementById('rating-form'));
-        const data = { ratings: {} };
-        
-        const ratingFields = [
-            'overall_sentiment', 'activity_breakdown', 'deal_momentum_indicators',
-            'reasoning', 'professional_gaps', 'excellence_indicators',
-            'risk_indicators', 'opportunity_indicators', 'temporal_trend',
-            'recommended_actions'
-        ];
-        
-        ratingFields.forEach(field => {
-            const score = formData.get(`${field}_score`);
-            const confidence = formData.get(`${field}_confidence`);
-            const notes = formData.get(`${field}_notes`);
-            
-            if (score || confidence || notes) {
-                data.ratings[field] = {
-                    score: score ? parseInt(score) : null,
-                    confidence: confidence ? parseInt(confidence) : null,
-                    notes: notes || ''
-                };
-            }
-        });
-        
-        return data;
     }
 
     getCurrentDealId() {
@@ -445,17 +218,6 @@ class DealValidationApp {
             
             if (response.ok) {
                 this.showAlert('✅ Rating submitted successfully!', 'success');
-                
-                // Clear local storage
-                const dealId = this.getCurrentDealId();
-                if (dealId) {
-                    localStorage.removeItem(`deal_${dealId}_draft`);
-                }
-                
-                // Clear auto-save interval
-                if (this.autoSaveInterval) {
-                    clearInterval(this.autoSaveInterval);
-                }
                 
                 // Redirect to next deal or completion page
                 setTimeout(() => {
@@ -972,4 +734,3 @@ if ('serviceWorker' in navigator) {
             });
     });
 }
-

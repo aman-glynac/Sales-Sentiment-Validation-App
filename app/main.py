@@ -33,23 +33,10 @@ DEALS_FILE = os.getenv("DEALS_FILE", "./data/deals.json")
 LLM_OUTPUTS_FILE = os.getenv("LLM_OUTPUTS_FILE", "./data/llm_outputs.json")
 ANNOTATIONS_FILE = os.getenv("ANNOTATIONS_FILE", "./data/annotations.json")
 
-# Add this constant at the top after other constants
-TARGET_ANNOTATIONS_PER_DEAL = 20  # Make this configurable
+TARGET_ANNOTATIONS_PER_DEAL = 3
 
-# Cache for loaded data
-data_cache = {}
-cache_timestamp = {}
-CACHE_DURATION = 60  # seconds
-
-def load_json_file(file_path: str, use_cache: bool = True) -> Dict:
-    """Load JSON file with caching and error handling"""
-    global data_cache, cache_timestamp
-    
-    # Check cache
-    if use_cache and file_path in data_cache:
-        if datetime.now().timestamp() - cache_timestamp.get(file_path, 0) < CACHE_DURATION:
-            return data_cache[file_path]
-    
+def load_json_file(file_path: str) -> Dict:
+    """Load JSON file with error handling"""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -87,10 +74,6 @@ def load_json_file(file_path: str, use_cache: bool = True) -> Dict:
             if not isinstance(data, dict) or 'users' not in data:
                 data = {"users": data if isinstance(data, list) else []}
         
-        # Update cache
-        data_cache[file_path] = data
-        cache_timestamp[file_path] = datetime.now().timestamp()
-        
         return data
         
     except FileNotFoundError:
@@ -107,27 +90,10 @@ def load_json_file(file_path: str, use_cache: bool = True) -> Dict:
         return {}
 
 def save_json_file(file_path: str, data: Dict):
-    """Save JSON file and update cache"""
-    global data_cache, cache_timestamp
-    
+    """Save JSON file"""
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    
-    # Update cache
-    data_cache[file_path] = data
-    cache_timestamp[file_path] = datetime.now().timestamp()
-
-def invalidate_cache(file_path: str = None):
-    """Invalidate cache for a specific file or all files"""
-    global data_cache, cache_timestamp
-    
-    if file_path:
-        data_cache.pop(file_path, None)
-        cache_timestamp.pop(file_path, None)
-    else:
-        data_cache.clear()
-        cache_timestamp.clear()
 
 def get_deal_annotation_counts(annotations: Dict) -> Dict[str, int]:
     """Get count of unique annotators for each deal"""
@@ -507,7 +473,7 @@ async def submit_rating(request: Request, current_user: str = Depends(get_curren
     }
     
     # Load and update annotations
-    annotations = load_json_file(ANNOTATIONS_FILE, use_cache=False)
+    annotations = load_json_file(ANNOTATIONS_FILE)
     
     if deal_id not in annotations:
         annotations[deal_id] = {}
@@ -581,7 +547,7 @@ async def add_user(
     if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=403, detail="Admin authentication required")
     
-    users_data = load_json_file(USERS_FILE, use_cache=False)
+    users_data = load_json_file(USERS_FILE)
     
     # Check if user already exists (case-insensitive)
     for user in users_data.get("users", []):
@@ -616,7 +582,7 @@ async def remove_user(
     if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=403, detail="Admin authentication required")
     
-    users_data = load_json_file(USERS_FILE, use_cache=False)
+    users_data = load_json_file(USERS_FILE)
     
     # Remove user from users list
     original_count = len(users_data.get("users", []))
@@ -632,7 +598,7 @@ async def remove_user(
     
     # Remove user's annotations if not keeping progress
     if not keep_progress:
-        annotations = load_json_file(ANNOTATIONS_FILE, use_cache=False)
+        annotations = load_json_file(ANNOTATIONS_FILE)
         modified = False
         
         for deal_id in list(annotations.keys()):
@@ -746,7 +712,7 @@ async def health_check():
         # Test file readability
         for file_path in essential_files:
             try:
-                load_json_file(file_path, use_cache=False)
+                load_json_file(file_path)
             except Exception as e:
                 return {
                     "status": "unhealthy",
