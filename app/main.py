@@ -33,7 +33,7 @@ DEALS_FILE = os.getenv("DEALS_FILE", "./data/deals.json")
 LLM_OUTPUTS_FILE = os.getenv("LLM_OUTPUTS_FILE", "./data/llm_outputs.json")
 ANNOTATIONS_FILE = os.getenv("ANNOTATIONS_FILE", "./data/annotations.json")
 
-TARGET_ANNOTATIONS_PER_DEAL = 3
+TARGET_ANNOTATIONS_PER_DEAL = 15
 
 def load_json_file(file_path: str) -> Dict:
     """Load JSON file with error handling"""
