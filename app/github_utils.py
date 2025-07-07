@@ -98,6 +98,27 @@ class GitHubManager:
         # Update file
         return self._update_file(file_path, new_content, sha, message)
     
+    def update_users(self, users_data: Dict[str, Any]) -> bool:
+        """Update users file on GitHub"""
+        if not self.token or not self.repo:
+            print("GitHub not configured - skipping upload")
+            return False
+        
+        file_path = "data/users.json"
+        
+        # Get current file SHA
+        current_content, sha = self._get_file_content(file_path)
+        
+        # Convert users data to JSON string
+        new_content = json.dumps(users_data, indent=2)
+        
+        # Create commit message
+        timestamp = datetime.utcnow().isoformat()
+        message = f"Update users - {timestamp}"
+        
+        # Update file
+        return self._update_file(file_path, new_content, sha, message)
+    
     def backup_data(self, data: Dict[str, Any], file_name: str) -> bool:
         """Backup data to GitHub"""
         if not self.token or not self.repo:
@@ -131,6 +152,19 @@ class GitHubManager:
             return json.loads(content) if content else {}
         except json.JSONDecodeError:
             return {}
+        
+    def get_users(self) -> Dict[str, Any]:
+        """Get users from GitHub"""
+        if not self.token or not self.repo:
+            return {"users": []}
+        
+        file_path = "data/users.json"
+        content, _ = self._get_file_content(file_path)
+        
+        try:
+            return json.loads(content) if content else {"users": []}
+        except json.JSONDecodeError:
+            return {"users": []}
     
     def create_repository_structure(self) -> bool:
         """Create initial repository structure"""

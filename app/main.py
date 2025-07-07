@@ -567,6 +567,11 @@ async def add_user(
     
     users_data["users"].append(new_user)
     save_json_file(USERS_FILE, users_data)
+
+    try:
+        github_manager.update_users(users_data)
+    except Exception as e:
+        print(f"GitHub update failed: {e}")
     
     return JSONResponse({"message": "User added successfully"})
 
@@ -595,6 +600,11 @@ async def remove_user(
         raise HTTPException(status_code=404, detail="User not found")
     
     save_json_file(USERS_FILE, users_data)
+
+    try:
+        github_manager.update_users(users_data)
+    except Exception as e:
+        print(f"GitHub update failed: {e}")
     
     # Remove user's annotations if not keeping progress
     if not keep_progress:
