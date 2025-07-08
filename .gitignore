@@ -9,6 +9,8 @@
 
 __pycache__/
 
+data/
+
 data/annotations.json
 data/users.json
 

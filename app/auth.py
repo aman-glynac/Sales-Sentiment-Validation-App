@@ -4,16 +4,12 @@ from jose import JWTError, jwt
 from fastapi import HTTPException, Cookie, Depends
 import os
 from dotenv import load_dotenv
-from .github_utils import GitHubManager
 
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 1
-
-# Initialize GitHub manager for auth
-github_manager = GitHubManager()
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Create JWT access token"""
@@ -38,48 +34,41 @@ def verify_token(token: str):
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-def get_current_user(access_token: Optional[str] = Cookie(None)):
-    """Get current user from JWT token with GitHub verification"""
+async def get_current_user(access_token: Optional[str] = Cookie(None)):
+    """Get current user from JWT token with database verification"""
     if not access_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     email = verify_token(access_token)
     
-    # Verify user exists in GitHub data
+    # Import here to avoid circular imports
+    from .database import db_manager
+    
+    # Verify user exists in database
     try:
-        users_data = github_manager.get_users()
+        user = await db_manager.get_user_by_email(email)
         
-        user_exists = False
-        for user in users_data.get("users", []):
-            if user["email"] == email:
-                user_exists = True
-                break
-        
-        if not user_exists:
+        if not user:
             raise HTTPException(status_code=401, detail="User not found")
         
         return email
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Authentication error: {str(e)}")
 
-def is_admin(email: str) -> bool:
+async def is_admin(email: str) -> bool:
     """Check if user is admin"""
     try:
-        users_data = github_manager.get_users()
-        
-        for user in users_data.get("users", []):
-            if user["email"] == email:
-                return user.get("is_admin", False)
-        
-        return False
+        from .database import db_manager
+        user = await db_manager.get_user_by_email(email)
+        return user.get("is_admin", False) if user else False
     except Exception:
         return False
 
-def get_admin_user(access_token: Optional[str] = Cookie(None)):
+async def get_admin_user(access_token: Optional[str] = Cookie(None)):
     """Get current admin user"""
-    email = get_current_user(access_token)
+    email = await get_current_user(access_token)
     
-    if not is_admin(email):
+    if not await is_admin(email):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     return email

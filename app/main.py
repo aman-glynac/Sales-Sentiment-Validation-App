@@ -7,13 +7,10 @@ import json
 import os
 from typing import Optional, Dict, List, Any
 from dotenv import load_dotenv
-import asyncio
-import threading
-import time
 
 from .models import *
-from .auth import *
-from .github_utils import GitHubManager
+from .auth import get_current_user, create_access_token, verify_token
+from .database import db_manager
 
 # Load environment variables
 load_dotenv()
@@ -27,119 +24,17 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 # Templates
 templates = Jinja2Templates(directory="templates")
 
-# Initialize GitHub manager
-github_manager = GitHubManager()
-
-# In-memory cache for data
-_data_cache = {
-    "users": {"users": []},
-    "deals": {},
-    "llm_outputs": {},
-    "annotations": {}
-}
-
-# Cache timestamps for refresh logic
-_cache_timestamps = {
-    "users": 0,
-    "deals": 0,
-    "llm_outputs": 0,
-    "annotations": 0
-}
-
-# Cache refresh interval in seconds
-CACHE_REFRESH_INTERVAL = 300  # 5 minutes
-
 TARGET_ANNOTATIONS_PER_DEAL = 15
 
-def get_data_from_github_or_cache(data_type: str, force_refresh: bool = False) -> Dict:
-    """Get data from GitHub with caching mechanism"""
-    current_time = time.time()
-    
-    # Check if we need to refresh the cache
-    if (force_refresh or 
-        current_time - _cache_timestamps[data_type] > CACHE_REFRESH_INTERVAL):
-        
+def parse_json_field(data, field_name, default=None):
+    """Parse JSON field from database"""
+    field_data = data.get(field_name, default)
+    if isinstance(field_data, str):
         try:
-            if data_type == "users":
-                new_data = github_manager.get_users()
-            elif data_type == "deals":
-                new_data = github_manager.get_deals()
-            elif data_type == "llm_outputs":
-                new_data = github_manager.get_llm_outputs()
-            elif data_type == "annotations":
-                new_data = github_manager.get_annotations()
-            else:
-                return _data_cache.get(data_type, {})
-            
-            # Update cache
-            _data_cache[data_type] = new_data
-            _cache_timestamps[data_type] = current_time
-            
-            print(f"Refreshed {data_type} cache from GitHub")
-            
-        except Exception as e:
-            print(f"Failed to refresh {data_type} from GitHub: {e}")
-            # Return cached data if GitHub fetch fails
-            
-    return _data_cache.get(data_type, {})
-
-def load_json_data(data_type: str) -> Dict:
-    """Load JSON data from GitHub cache"""
-    data = get_data_from_github_or_cache(data_type)
-    
-    # Normalize data structures
-    if data_type == 'deals':
-        # Always work with dict structure
-        if isinstance(data, list):
-            normalized = {}
-            for deal in data:
-                if 'deal_id' in deal:
-                    normalized[str(deal['deal_id'])] = deal
-            data = normalized
-        # Ensure all deal_ids are strings
-        else:
-            normalized = {}
-            for key, value in data.items():
-                normalized[str(key)] = value
-            data = normalized
-    
-    elif data_type == 'llm_outputs':
-        # Normalize to dict if array
-        if isinstance(data, list):
-            normalized = {k: v for d in data for k, v in d.items()}
-            data = normalized
-        # Ensure all keys are strings
-        else:
-            normalized = {}
-            for key, value in data.items():
-                normalized[str(key)] = value
-            data = normalized
-    
-    elif data_type == 'users':
-        # Ensure proper structure
-        if not isinstance(data, dict) or 'users' not in data:
-            data = {"users": data if isinstance(data, list) else []}
-    
-    return data
-
-def save_json_data(data_type: str, data: Dict):
-    """Save JSON data to GitHub and update cache"""
-    # Update local cache immediately
-    _data_cache[data_type] = data
-    _cache_timestamps[data_type] = time.time()
-    
-    # Save to GitHub asynchronously
-    try:
-        if data_type == "users":
-            github_manager.update_users(data)
-        elif data_type == "annotations":
-            github_manager.update_annotations(data)
-        elif data_type == "deals":
-            github_manager.update_deals(data)
-        elif data_type == "llm_outputs":
-            github_manager.update_llm_outputs(data)
-    except Exception as e:
-        print(f"Failed to save {data_type} to GitHub: {e}")
+            return json.loads(field_data)
+        except:
+            return default
+    return field_data if field_data is not None else default
 
 def get_deal_annotation_counts(annotations: Dict) -> Dict[str, int]:
     """Get count of unique annotators for each deal"""
@@ -148,26 +43,23 @@ def get_deal_annotation_counts(annotations: Dict) -> Dict[str, int]:
         deal_counts[deal_id] = len(deal_annotations.keys())
     return deal_counts
 
-def get_next_deal_for_user(email: str) -> Optional[str]:
+async def get_next_deal_for_user(email: str) -> Optional[str]:
     """Get next deal ID for user to annotate with intelligent distribution"""
-    deals = load_json_data("deals")
-    annotations = load_json_data("annotations")
-    
     # Get deals this user has already completed
-    user_completed_deals = set()
-    for deal_id, deal_annotations in annotations.items():
-        if email in deal_annotations:
-            user_completed_deals.add(str(deal_id))
+    user_completed_deals = set(await db_manager.get_user_annotations(email))
+    
+    # Get all deals
+    deals = await db_manager.get_deals()
     
     # Get annotation counts for all deals
-    deal_counts = get_deal_annotation_counts(annotations)
+    annotation_counts = await db_manager.get_annotation_counts_by_deal()
     
     # Create list of available deals for this user with their current annotation counts
     available_deals = []
     for deal_id in deals.keys():
         deal_id = str(deal_id)
         if deal_id not in user_completed_deals:
-            current_count = deal_counts.get(deal_id, 0)
+            current_count = annotation_counts.get(deal_id, 0)
             if current_count < TARGET_ANNOTATIONS_PER_DEAL:
                 available_deals.append((deal_id, current_count))
     
@@ -180,36 +72,6 @@ def get_next_deal_for_user(email: str) -> Optional[str]:
     
     # Return the deal with the lowest annotation count
     return available_deals[0][0]
-
-def get_user_progress(email: str) -> Dict:
-    """Get user's annotation progress with updated logic"""
-    annotations = load_json_data("annotations")
-    deals = load_json_data("deals")
-    
-    # Get deals this user has completed
-    completed_deals = []
-    for deal_id, deal_annotations in annotations.items():
-        if email in deal_annotations:
-            completed_deals.append(deal_id)
-    
-    # Calculate total possible deals for this user
-    # This is the number of deals that still need annotations
-    deal_counts = get_deal_annotation_counts(annotations)
-    available_deals_for_user = 0
-    
-    for deal_id in deals.keys():
-        deal_id = str(deal_id)
-        current_count = deal_counts.get(deal_id, 0)
-        if current_count < TARGET_ANNOTATIONS_PER_DEAL and deal_id not in completed_deals:
-            available_deals_for_user += 1
-    
-    total_possible_for_user = len(completed_deals) + available_deals_for_user
-    
-    return {
-        "completed_count": len(completed_deals),
-        "total_deals": total_possible_for_user,
-        "completed_deals": completed_deals
-    }
 
 def sort_activities_chronologically(activities: List[Dict]) -> List[Dict]:
     """Sort activities by timestamp"""
@@ -233,7 +95,7 @@ def sort_activities_chronologically(activities: List[Dict]) -> List[Dict]:
     
     return sorted(activities, key=get_timestamp)
 
-def get_admin_dashboard_context(request: Request, authenticated: bool = True):
+async def get_admin_dashboard_context(request: Request, authenticated: bool = True):
     """Get admin dashboard context data"""
     if not authenticated:
         return {
@@ -241,53 +103,48 @@ def get_admin_dashboard_context(request: Request, authenticated: bool = True):
             "authenticated": False
         }
     
-    users_data = load_json_data("users")
-    annotations = load_json_data("annotations")
-    deals = load_json_data("deals")
-    
-    # Calculate detailed progress for each user
+    # Get users with their progress
+    users = await db_manager.get_users()
     user_progress = []
-    total_annotations = 0
     
-    for user in users_data.get("users", []):
-        progress = get_user_progress(user["email"])
+    for user in users:
+        progress = await db_manager.get_user_progress(user["email"])
         user_progress.append({
             "email": user["email"],
             "name": user["name"],
             "completed_count": progress["completed_count"],
-            "total_deals": progress["total_deals"],  # This is now user-specific
+            "total_deals": progress["total_deals"],
             "is_admin": user.get("is_admin", False)
         })
-        total_annotations += progress["completed_count"]
     
-    # Calculate deal distribution stats
-    deal_counts = get_deal_annotation_counts(annotations)
-    completed_deals = sum(1 for count in deal_counts.values() if count >= TARGET_ANNOTATIONS_PER_DEAL)
+    # Get admin stats
+    admin_stats = await db_manager.get_admin_stats()
     
     return {
         "request": request,
         "users": user_progress,
-        "total_deals": len(deals),
-        "total_annotations": total_annotations,
-        "completed_deals": completed_deals,
+        "total_deals": admin_stats['total_deals'],
+        "total_annotations": admin_stats['total_annotations'],
+        "completed_deals": admin_stats['completed_deals'],
         "target_annotations_per_deal": TARGET_ANNOTATIONS_PER_DEAL,
         "authenticated": True
     }
 
-# Initialize cache on startup
+# Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
-    """Load initial data from GitHub on startup"""
-    print("Loading initial data from GitHub...")
+    """Initialize database connection on startup"""
     try:
-        # Force refresh all data on startup
-        get_data_from_github_or_cache("users", force_refresh=True)
-        get_data_from_github_or_cache("deals", force_refresh=True)
-        get_data_from_github_or_cache("llm_outputs", force_refresh=True)
-        get_data_from_github_or_cache("annotations", force_refresh=True)
-        print("Initial data loaded successfully")
+        await db_manager.initialize()
+        print("Database initialized successfully")
     except Exception as e:
-        print(f"Failed to load initial data: {e}")
+        print(f"Failed to initialize database: {e}")
+        raise e
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Close database connection on shutdown"""
+    await db_manager.close()
 
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
@@ -297,24 +154,17 @@ async def login_page(request: Request):
 @app.post("/login")
 async def login(request: Request, email: str = Form(...)):
     """Handle user login"""
-    users_data = load_json_data("users")
-    
     # Check if user exists
-    user_exists = False
-    for user in users_data.get("users", []):
-        if user["email"].lower() == email.lower():
-            user_exists = True
-            email = user["email"]  # Use the exact case from the database
-            break
+    user = await db_manager.get_user_by_email(email.lower())
     
-    if not user_exists:
+    if not user:
         return templates.TemplateResponse("login.html", {
             "request": request,
             "error": "Email not authorized. Please contact your administrator."
         })
     
     # Create JWT token
-    token = create_access_token(data={"sub": email})
+    token = create_access_token(data={"sub": user["email"]})
     
     # Set cookie and redirect
     response = RedirectResponse(url="/instructions", status_code=302)
@@ -330,7 +180,7 @@ async def login(request: Request, email: str = Form(...)):
 @app.get("/instructions", response_class=HTMLResponse)
 async def instructions(request: Request, current_user: str = Depends(get_current_user)):
     """Instructions page"""
-    progress = get_user_progress(current_user)
+    progress = await db_manager.get_user_progress(current_user)
     
     return templates.TemplateResponse("instructions.html", {
         "request": request,
@@ -341,7 +191,7 @@ async def instructions(request: Request, current_user: str = Depends(get_current
 @app.get("/start-annotation")
 async def start_annotation(current_user: str = Depends(get_current_user)):
     """Start annotation process"""
-    next_deal = get_next_deal_for_user(current_user)
+    next_deal = await get_next_deal_for_user(current_user)
     
     if not next_deal:
         return RedirectResponse(url="/instructions?completed=true", status_code=302)
@@ -354,9 +204,8 @@ async def get_deal_distribution(admin_token: Optional[str] = Cookie(None)):
     if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    deals = load_json_data("deals")
-    annotations = load_json_data("annotations")
-    deal_counts = get_deal_annotation_counts(annotations)
+    deals = await db_manager.get_deals()
+    annotation_counts = await db_manager.get_annotation_counts_by_deal()
     
     distribution_stats = {
         "target_per_deal": TARGET_ANNOTATIONS_PER_DEAL,
@@ -369,7 +218,7 @@ async def get_deal_distribution(admin_token: Optional[str] = Cookie(None)):
     
     for deal_id in deals.keys():
         deal_id = str(deal_id)
-        current_count = deal_counts.get(deal_id, 0)
+        current_count = annotation_counts.get(deal_id, 0)
         
         status = "not_started"
         if current_count >= TARGET_ANNOTATIONS_PER_DEAL:
@@ -397,33 +246,33 @@ async def get_deal_distribution(admin_token: Optional[str] = Cookie(None)):
 @app.get("/activities/{deal_id}", response_class=HTMLResponse)
 async def view_activities(request: Request, deal_id: str, current_user: str = Depends(get_current_user)):
     """View deal activities"""
-    deals = load_json_data("deals")
-    
     # Ensure deal_id is string
     deal_id = str(deal_id)
     
-    if deal_id not in deals:
+    deal = await db_manager.get_deal_by_id(deal_id)
+    if not deal:
         return templates.TemplateResponse("activities.html", {
             "request": request,
             "error": f"Deal {deal_id} not found",
             "user_email": current_user,
-            "progress": get_user_progress(current_user)
+            "progress": await db_manager.get_user_progress(current_user)
         })
     
     # Check if user already completed this deal
-    progress = get_user_progress(current_user)
-    if deal_id in progress["completed_deals"]:
+    user_completed_deals = await db_manager.get_user_annotations(current_user)
+    if deal_id in user_completed_deals:
         return templates.TemplateResponse("activities.html", {
             "request": request,
             "error": "You have already completed this deal. Please continue with the next one.",
             "user_email": current_user,
-            "progress": progress
+            "progress": await db_manager.get_user_progress(current_user)
         })
     
-    deal = deals[deal_id]
+    # Parse activities from JSON string to Python objects
+    activities = parse_json_field(deal, "activities", [])
     
     # Sort activities chronologically
-    activities = sort_activities_chronologically(deal.get("activities", []))
+    activities = sort_activities_chronologically(activities)
     
     return templates.TemplateResponse("activities.html", {
         "request": request,
@@ -431,46 +280,59 @@ async def view_activities(request: Request, deal_id: str, current_user: str = De
         "activities": activities,
         "deal_id": deal_id,
         "user_email": current_user,
-        "progress": progress
+        "progress": await db_manager.get_user_progress(current_user)
     })
 
 @app.get("/rating/{deal_id}", response_class=HTMLResponse)
 async def rating_interface(request: Request, deal_id: str, current_user: str = Depends(get_current_user)):
     """Rating interface for LLM outputs"""
-    deals = load_json_data("deals")
-    llm_outputs = load_json_data("llm_outputs")
-
     # Ensure deal_id is string
     deal_id = str(deal_id)
     
-    if deal_id not in deals:
+    deal = await db_manager.get_deal_by_id(deal_id)
+    if not deal:
         return templates.TemplateResponse("rating.html", {
             "request": request,
             "error": f"Deal {deal_id} not found",
             "user_email": current_user,
-            "progress": get_user_progress(current_user)
+            "progress": await db_manager.get_user_progress(current_user)
         })
     
-    if deal_id not in llm_outputs:
+    llm_output_raw = await db_manager.get_llm_output_by_deal_id(deal_id)
+    if not llm_output_raw:
         return templates.TemplateResponse("rating.html", {
             "request": request,
             "error": f"AI analysis not found for deal {deal_id}",
             "user_email": current_user,
-            "progress": get_user_progress(current_user)
+            "progress": await db_manager.get_user_progress(current_user)
         })
     
+    # Parse JSON fields in LLM output
+    llm_output = {
+        "overall_sentiment": llm_output_raw.get("overall_sentiment"),
+        "sentiment_score": llm_output_raw.get("sentiment_score"),
+        "confidence": llm_output_raw.get("confidence"),
+        "activity_breakdown": parse_json_field(llm_output_raw, "activity_breakdown", {}),
+        "deal_momentum_indicators": parse_json_field(llm_output_raw, "deal_momentum_indicators", {}),
+        "reasoning": llm_output_raw.get("reasoning"),
+        "professional_gaps": parse_json_field(llm_output_raw, "professional_gaps", []),
+        "excellence_indicators": parse_json_field(llm_output_raw, "excellence_indicators", []),
+        "risk_indicators": parse_json_field(llm_output_raw, "risk_indicators", []),
+        "opportunity_indicators": parse_json_field(llm_output_raw, "opportunity_indicators", []),
+        "temporal_trend": llm_output_raw.get("temporal_trend"),
+        "recommended_actions": parse_json_field(llm_output_raw, "recommended_actions", []),
+        "context_analysis_notes": parse_json_field(llm_output_raw, "context_analysis_notes", [])
+    }
+    
     # Check if user already completed this deal
-    progress = get_user_progress(current_user)
-    if deal_id in progress["completed_deals"]:
+    user_completed_deals = await db_manager.get_user_annotations(current_user)
+    if deal_id in user_completed_deals:
         return templates.TemplateResponse("rating.html", {
             "request": request,
             "error": "You have already completed this deal. Please continue with the next one.",
             "user_email": current_user,
-            "progress": progress
+            "progress": await db_manager.get_user_progress(current_user)
         })
-    
-    deal = deals[deal_id]
-    llm_output = llm_outputs[deal_id]
     
     return templates.TemplateResponse("rating.html", {
         "request": request,
@@ -478,7 +340,7 @@ async def rating_interface(request: Request, deal_id: str, current_user: str = D
         "llm_output": llm_output,
         "deal_id": deal_id,
         "user_email": current_user,
-        "progress": progress
+        "progress": await db_manager.get_user_progress(current_user)
     })
 
 @app.post("/submit-rating")
@@ -491,8 +353,8 @@ async def submit_rating(request: Request, current_user: str = Depends(get_curren
         raise HTTPException(status_code=400, detail="Deal ID required")
     
     # Check if user already completed this deal
-    progress = get_user_progress(current_user)
-    if deal_id in progress["completed_deals"]:
+    user_completed_deals = await db_manager.get_user_annotations(current_user)
+    if deal_id in user_completed_deals:
         raise HTTPException(status_code=400, detail="Deal already completed")
     
     # Extract ratings
@@ -525,32 +387,23 @@ async def submit_rating(request: Request, current_user: str = Depends(get_curren
             detail=f"Missing ratings for: {', '.join(missing_fields)}"
         )
     
-    # Create annotation entry
-    annotation = {
-        "user_email": current_user,
-        "timestamp": datetime.utcnow().isoformat(),
-        "ratings": ratings,
-        "time_spent_seconds": int(form_data.get("time_spent", 0))
-    }
+    # Save annotation to database
+    time_spent = int(form_data.get("time_spent", 0))
+    success = await db_manager.create_annotation(deal_id, current_user, ratings, time_spent)
     
-    # Load and update annotations
-    annotations = load_json_data("annotations")
-    
-    if deal_id not in annotations:
-        annotations[deal_id] = {}
-    
-    annotations[deal_id][current_user] = annotation
-    
-    # Save to GitHub
-    save_json_data("annotations", annotations)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to save annotation")
     
     # Get next deal
-    next_deal = get_next_deal_for_user(current_user)
+    next_deal = await get_next_deal_for_user(current_user)
+    
+    # Update user progress
+    progress = await db_manager.get_user_progress(current_user)
     
     return JSONResponse({
         "message": "Rating submitted successfully", 
         "next_deal": next_deal,
-        "completed_count": len(progress["completed_deals"]) + 1
+        "completed_count": progress["completed_count"]
     })
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -558,7 +411,7 @@ async def admin_dashboard(request: Request, admin_token: Optional[str] = Cookie(
     """Admin dashboard with persistent session"""
     # Check if already authenticated via cookie
     if admin_token and admin_token == os.getenv("ADMIN_PASSWORD"):
-        context = get_admin_dashboard_context(request, authenticated=True)
+        context = await get_admin_dashboard_context(request, authenticated=True)
         return templates.TemplateResponse("admin.html", context)
     
     return templates.TemplateResponse("admin.html", {
@@ -577,7 +430,7 @@ async def admin_login(request: Request, admin_password: str = Form(...)):
         })
     
     # Get dashboard data
-    context = get_admin_dashboard_context(request, authenticated=True)
+    context = await get_admin_dashboard_context(request, authenticated=True)
     
     # Create response with cookie
     response = templates.TemplateResponse("admin.html", context)
@@ -602,26 +455,15 @@ async def add_user(
     if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=403, detail="Admin authentication required")
     
-    users_data = load_json_data("users")
+    # Check if user already exists
+    existing_user = await db_manager.get_user_by_email(email.lower())
+    if existing_user:
+        raise HTTPException(status_code=400, detail="User already exists")
     
-    # Check if user already exists (case-insensitive)
-    for user in users_data.get("users", []):
-        if user["email"].lower() == email.lower():
-            raise HTTPException(status_code=400, detail="User already exists")
-    
-    # Add new user
-    new_user = {
-        "email": email,
-        "name": name,
-        "is_admin": False,
-        "created_at": datetime.utcnow().isoformat()
-    }
-    
-    if "users" not in users_data:
-        users_data["users"] = []
-    
-    users_data["users"].append(new_user)
-    save_json_data("users", users_data)
+    # Create new user
+    success = await db_manager.create_user(email.lower(), name, False)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to create user")
     
     return JSONResponse({"message": "User added successfully"})
 
@@ -637,35 +479,19 @@ async def remove_user(
     if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=403, detail="Admin authentication required")
     
-    users_data = load_json_data("users")
-    
-    # Remove user from users list
-    original_count = len(users_data.get("users", []))
-    users_data["users"] = [
-        user for user in users_data.get("users", []) 
-        if user["email"].lower() != email.lower()
-    ]
-    
-    if len(users_data["users"]) == original_count:
+    # Check if user exists
+    user = await db_manager.get_user_by_email(email.lower())
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    save_json_data("users", users_data)
     
     # Remove user's annotations if not keeping progress
     if not keep_progress:
-        annotations = load_json_data("annotations")
-        modified = False
-        
-        for deal_id in list(annotations.keys()):
-            if email in annotations[deal_id]:
-                del annotations[deal_id][email]
-                modified = True
-                # Remove empty deal entries
-                if not annotations[deal_id]:
-                    del annotations[deal_id]
-        
-        if modified:
-            save_json_data("annotations", annotations)
+        await db_manager.delete_user_annotations(email.lower())
+    
+    # Remove user
+    success = await db_manager.delete_user(email.lower())
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to remove user")
     
     return JSONResponse({"message": "User removed successfully"})
 
@@ -680,7 +506,7 @@ async def logout():
 @app.get("/api/progress")
 async def get_progress_api(current_user: str = Depends(get_current_user)):
     """Get user progress API"""
-    progress = get_user_progress(current_user)
+    progress = await db_manager.get_user_progress(current_user)
     return progress
 
 @app.get("/api/admin/stats")
@@ -689,22 +515,17 @@ async def get_admin_stats(request: Request, admin_token: Optional[str] = Cookie(
     if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    users_data = load_json_data("users")
-    annotations = load_json_data("annotations")
-    deals = load_json_data("deals")
+    admin_stats = await db_manager.get_admin_stats()
     
-    # Calculate statistics with new logic
-    total_users = len(users_data.get("users", []))
-    total_deals = len(deals)
-    total_annotations = sum(len(deal_annots) for deal_annots in annotations.values())
+    # Calculate target total annotations
+    target_total_annotations = admin_stats['total_deals'] * TARGET_ANNOTATIONS_PER_DEAL
     
-    # Calculate target total annotations (deals * target per deal)
-    target_total_annotations = total_deals * TARGET_ANNOTATIONS_PER_DEAL
-    
-    # User completion stats
+    # Get user completion stats
+    users = await db_manager.get_users()
     completion_stats = []
-    for user in users_data.get("users", []):
-        progress = get_user_progress(user["email"])
+    
+    for user in users:
+        progress = await db_manager.get_user_progress(user["email"])
         completion_stats.append({
             "email": user["email"],
             "completed": progress["completed_count"],
@@ -712,11 +533,11 @@ async def get_admin_stats(request: Request, admin_token: Optional[str] = Cookie(
         })
     
     return {
-        "total_users": total_users,
-        "total_deals": total_deals,
-        "total_annotations": total_annotations,
+        "total_users": admin_stats['total_users'],
+        "total_deals": admin_stats['total_deals'],
+        "total_annotations": admin_stats['total_annotations'],
         "target_total_annotations": target_total_annotations,
-        "overall_progress": (total_annotations / target_total_annotations * 100) if target_total_annotations > 0 else 0,
+        "overall_progress": (admin_stats['total_annotations'] / target_total_annotations * 100) if target_total_annotations > 0 else 0,
         "user_stats": completion_stats
     }
 
@@ -727,13 +548,39 @@ async def download_data(data_type: str, admin_token: Optional[str] = Cookie(None
         raise HTTPException(status_code=403, detail="Admin access required")
     
     if data_type == "users":
-        data = load_json_data("users")
+        users = await db_manager.get_users()
+        data = {"users": users}
     elif data_type == "annotations":
-        data = load_json_data("annotations")
+        data = await db_manager.get_annotations()
     elif data_type == "deals":
-        data = load_json_data("deals")
+        deals_raw = await db_manager.get_deals()
+        # Parse JSON fields for export
+        deals = {}
+        for deal_id, deal_data in deals_raw.items():
+            deals[deal_id] = dict(deal_data)
+            deals[deal_id]["activities"] = parse_json_field(deal_data, "activities", [])
+        data = deals
     elif data_type == "llm_outputs":
-        data = load_json_data("llm_outputs")
+        llm_outputs_raw = await db_manager.get_llm_outputs()
+        # Parse JSON fields for export
+        llm_outputs = {}
+        for deal_id, output_data in llm_outputs_raw.items():
+            llm_outputs[deal_id] = {
+                "overall_sentiment": output_data.get("overall_sentiment"),
+                "sentiment_score": output_data.get("sentiment_score"),
+                "confidence": output_data.get("confidence"),
+                "activity_breakdown": parse_json_field(output_data, "activity_breakdown", {}),
+                "deal_momentum_indicators": parse_json_field(output_data, "deal_momentum_indicators", {}),
+                "reasoning": output_data.get("reasoning"),
+                "professional_gaps": parse_json_field(output_data, "professional_gaps", []),
+                "excellence_indicators": parse_json_field(output_data, "excellence_indicators", []),
+                "risk_indicators": parse_json_field(output_data, "risk_indicators", []),
+                "opportunity_indicators": parse_json_field(output_data, "opportunity_indicators", []),
+                "temporal_trend": output_data.get("temporal_trend"),
+                "recommended_actions": parse_json_field(output_data, "recommended_actions", []),
+                "context_analysis_notes": parse_json_field(output_data, "context_analysis_notes", [])
+            }
+        data = llm_outputs
     else:
         raise HTTPException(status_code=404, detail="Invalid data type")
     
@@ -745,154 +592,31 @@ async def download_data(data_type: str, admin_token: Optional[str] = Cookie(None
         }
     )
 
-@app.get("/api/refresh-cache")
-async def refresh_cache(admin_token: Optional[str] = Cookie(None)):
-    """Manually refresh cache from GitHub"""
-    if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    try:
-        # Force refresh all data
-        get_data_from_github_or_cache("users", force_refresh=True)
-        get_data_from_github_or_cache("deals", force_refresh=True)
-        get_data_from_github_or_cache("llm_outputs", force_refresh=True)
-        get_data_from_github_or_cache("annotations", force_refresh=True)
-        
-        return JSONResponse({"message": "Cache refreshed successfully"})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to refresh cache: {str(e)}")
-
-@app.get("/api/test-github-files")
-async def test_github_files(admin_token: Optional[str] = Cookie(None)):
-    """Test function to check what files exist and where we're looking"""
-    if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    file_paths_to_check = [
-        "users.json",
-        "deals.json", 
-        "llm_outputs.json",
-        "annotations.json",
-        "data/users.json",
-        "data/deals.json",
-        "data/llm_outputs.json", 
-        "data/annotations.json"
-    ]
-    
-    results = {}
-    
-    for file_path in file_paths_to_check:
-        try:
-            content, sha = github_manager._get_file_content(file_path)
-            if content:
-                # Try to parse as JSON to check validity
-                try:
-                    parsed = json.loads(content)
-                    results[file_path] = {
-                        "exists": True,
-                        "valid_json": True,
-                        "content_length": len(content),
-                        "sha": sha[:8] if sha else "no-sha",
-                        "preview": str(parsed)[:100] + "..." if len(str(parsed)) > 100 else str(parsed)
-                    }
-                except json.JSONDecodeError as e:
-                    results[file_path] = {
-                        "exists": True,
-                        "valid_json": False,
-                        "content_length": len(content),
-                        "sha": sha[:8] if sha else "no-sha",
-                        "error": str(e),
-                        "preview": content[:100] + "..." if len(content) > 100 else content
-                    }
-            else:
-                results[file_path] = {
-                    "exists": False,
-                    "valid_json": False,
-                    "content_length": 0,
-                    "sha": "none",
-                    "preview": "File not found"
-                }
-        except Exception as e:
-            results[file_path] = {
-                "exists": False,
-                "valid_json": False,
-                "content_length": 0,
-                "sha": "error",
-                "error": str(e),
-                "preview": f"Error: {str(e)}"
-            }
-    
-    return {
-        "github_repo": github_manager.repo,
-        "github_branch": github_manager.branch,
-        "github_configured": bool(github_manager.token and github_manager.repo),
-        "files_checked": results,
-        "current_paths_being_used": {
-            "users": "data/users.json",
-            "deals": "data/deals.json", 
-            "llm_outputs": "data/llm_outputs.json",
-            "annotations": "data/annotations.json"
-        },
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
     try:
-        # Check GitHub connectivity and data availability
-        github_status = {
-            "users": False,
-            "deals": False, 
-            "llm_outputs": False,
-            "annotations": False
-        }
+        # Check database connectivity
+        db_healthy = await db_manager.health_check()
         
-        errors = []
-        
-        # Test GitHub connectivity for each data type
-        for data_type in github_status.keys():
-            try:
-                data = get_data_from_github_or_cache(data_type, force_refresh=True)
-                if data:
-                    github_status[data_type] = True
-                else:
-                    errors.append(f"No data available for {data_type}")
-            except Exception as e:
-                errors.append(f"Failed to load {data_type}: {str(e)}")
-        
-        # Check if GitHub manager is properly configured
-        if not github_manager.token or not github_manager.repo:
-            errors.append("GitHub configuration missing (token or repo)")
-        
-        # Determine overall health
-        if not any(github_status.values()):
+        if not db_healthy:
             return JSONResponse({
                 "status": "unhealthy",
-                "reason": "No data sources available",
-                "errors": errors,
-                "github_status": github_status,
+                "reason": "Database connection failed",
                 "timestamp": datetime.utcnow().isoformat()
             }, status_code=503)
         
-        if errors:
-            return JSONResponse({
-                "status": "degraded",
-                "reason": "Some data sources unavailable",
-                "errors": errors,
-                "github_status": github_status,
-                "timestamp": datetime.utcnow().isoformat()
-            }, status_code=200)
+        # Get basic stats to verify data availability
+        admin_stats = await db_manager.get_admin_stats()
         
         return JSONResponse({
             "status": "healthy",
             "version": "2.0.0",
-            "github_status": github_status,
-            "cache_info": {
-                "last_refresh": {
-                    data_type: datetime.fromtimestamp(timestamp).isoformat() 
-                    for data_type, timestamp in _cache_timestamps.items()
-                }
+            "database_status": "connected",
+            "data_stats": {
+                "users": admin_stats['total_users'],
+                "deals": admin_stats['total_deals'],
+                "annotations": admin_stats['total_annotations']
             },
             "timestamp": datetime.utcnow().isoformat()
         })
@@ -903,30 +627,6 @@ async def health_check():
             "reason": str(e),
             "timestamp": datetime.utcnow().isoformat()
         }, status_code=503)
-
-def get_current_user_updated(access_token: Optional[str] = Cookie(None)):
-    """Updated get_current_user that checks GitHub data"""
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    email = verify_token(access_token)
-    
-    # Verify user exists in GitHub data
-    users_data = load_json_data("users")
-    
-    user_exists = False
-    for user in users_data.get("users", []):
-        if user["email"] == email:
-            user_exists = True
-            break
-    
-    if not user_exists:
-        raise HTTPException(status_code=401, detail="User not found")
-    
-    return email
-
-# Replace the dependency
-app.dependency_overrides[get_current_user] = get_current_user_updated
 
 if __name__ == "__main__":
     import uvicorn
