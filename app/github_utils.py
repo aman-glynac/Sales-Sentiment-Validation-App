@@ -82,7 +82,7 @@ class GitHubManager:
         if not self.token or not self.repo:
             raise Exception("GitHub not configured")
         
-        file_path = "annotations.json"
+        file_path = "data/annotations.json"
         
         # Get current file SHA
         current_content, sha = self._get_file_content(file_path)
@@ -102,7 +102,7 @@ class GitHubManager:
         if not self.token or not self.repo:
             raise Exception("GitHub not configured")
         
-        file_path = "users.json"
+        file_path = "data/users.json"
         
         # Get current file SHA
         current_content, sha = self._get_file_content(file_path)
@@ -122,7 +122,7 @@ class GitHubManager:
         if not self.token or not self.repo:
             raise Exception("GitHub not configured")
         
-        file_path = "deals.json"
+        file_path = "data/deals.json"
         
         # Get current file SHA
         current_content, sha = self._get_file_content(file_path)
@@ -142,7 +142,7 @@ class GitHubManager:
         if not self.token or not self.repo:
             raise Exception("GitHub not configured")
         
-        file_path = "llm_outputs.json"
+        file_path = "data/llm_outputs.json"
         
         # Get current file SHA
         current_content, sha = self._get_file_content(file_path)
@@ -235,11 +235,10 @@ class GitHubManager:
             return False
         
         files_to_create = [
-            ("annotations.json", "{}"),
-            ("users.json", '{"users": []}'),
-            ("deals.json", "{}"),
-            ("llm_outputs.json", "{}"),
-            ("README.md", "# Deal Validation Data Repository\n\nThis repository stores all data for the deal validation app.")
+            ("data/annotations.json", "{}"),
+            ("data/users.json", '{"users": []}'),
+            ("data/deals.json", "{}"),
+            ("data/llm_outputs.json", "{}")
         ]
         
         success = True
