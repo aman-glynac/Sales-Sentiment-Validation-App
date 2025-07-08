@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class GitHubManager:
-    """Manage GitHub repository operations for storing annotations"""
+    """Manage GitHub repository operations for storing all data"""
     
     def __init__(self):
         self.token = os.getenv("GITHUB_TOKEN")
@@ -18,7 +18,7 @@ class GitHubManager:
         self.base_url = f"https://api.github.com/repos/{self.repo}"
         
         if not self.token or not self.repo:
-            print("Warning: GitHub configuration not found. Annotations will only be stored locally.")
+            print("Warning: GitHub configuration not found. App will not function properly.")
     
     def _get_headers(self) -> Dict[str, str]:
         """Get GitHub API headers"""
@@ -46,7 +46,7 @@ class GitHubManager:
         
         except Exception as e:
             print(f"Error fetching file from GitHub: {e}")
-            return "", ""
+            raise e
     
     def _update_file(self, file_path: str, content: str, sha: str = "", message: str = "") -> bool:
         """Update file on GitHub"""
@@ -80,10 +80,9 @@ class GitHubManager:
     def update_annotations(self, annotations: Dict[str, Any]) -> bool:
         """Update annotations file on GitHub"""
         if not self.token or not self.repo:
-            print("GitHub not configured - skipping upload")
-            return False
+            raise Exception("GitHub not configured")
         
-        file_path = "data/annotations.json"
+        file_path = "annotations.json"
         
         # Get current file SHA
         current_content, sha = self._get_file_content(file_path)
@@ -101,10 +100,9 @@ class GitHubManager:
     def update_users(self, users_data: Dict[str, Any]) -> bool:
         """Update users file on GitHub"""
         if not self.token or not self.repo:
-            print("GitHub not configured - skipping upload")
-            return False
+            raise Exception("GitHub not configured")
         
-        file_path = "data/users.json"
+        file_path = "users.json"
         
         # Get current file SHA
         current_content, sha = self._get_file_content(file_path)
@@ -119,11 +117,102 @@ class GitHubManager:
         # Update file
         return self._update_file(file_path, new_content, sha, message)
     
+    def update_deals(self, deals_data: Dict[str, Any]) -> bool:
+        """Update deals file on GitHub"""
+        if not self.token or not self.repo:
+            raise Exception("GitHub not configured")
+        
+        file_path = "deals.json"
+        
+        # Get current file SHA
+        current_content, sha = self._get_file_content(file_path)
+        
+        # Convert deals data to JSON string
+        new_content = json.dumps(deals_data, indent=2)
+        
+        # Create commit message
+        timestamp = datetime.utcnow().isoformat()
+        message = f"Update deals - {timestamp}"
+        
+        # Update file
+        return self._update_file(file_path, new_content, sha, message)
+    
+    def update_llm_outputs(self, llm_outputs_data: Dict[str, Any]) -> bool:
+        """Update LLM outputs file on GitHub"""
+        if not self.token or not self.repo:
+            raise Exception("GitHub not configured")
+        
+        file_path = "llm_outputs.json"
+        
+        # Get current file SHA
+        current_content, sha = self._get_file_content(file_path)
+        
+        # Convert LLM outputs data to JSON string
+        new_content = json.dumps(llm_outputs_data, indent=2)
+        
+        # Create commit message
+        timestamp = datetime.utcnow().isoformat()
+        message = f"Update LLM outputs - {timestamp}"
+        
+        # Update file
+        return self._update_file(file_path, new_content, sha, message)
+    
+    def get_annotations(self) -> Dict[str, Any]:
+        """Get annotations from GitHub"""
+        if not self.token or not self.repo:
+            raise Exception("GitHub not configured")
+        
+        file_path = "annotations.json"
+        content, _ = self._get_file_content(file_path)
+        
+        try:
+            return json.loads(content) if content else {}
+        except json.JSONDecodeError:
+            return {}
+        
+    def get_users(self) -> Dict[str, Any]:
+        """Get users from GitHub"""
+        if not self.token or not self.repo:
+            raise Exception("GitHub not configured")
+        
+        file_path = "users.json"
+        content, _ = self._get_file_content(file_path)
+        
+        try:
+            return json.loads(content) if content else {"users": []}
+        except json.JSONDecodeError:
+            return {"users": []}
+    
+    def get_deals(self) -> Dict[str, Any]:
+        """Get deals from GitHub"""
+        if not self.token or not self.repo:
+            raise Exception("GitHub not configured")
+        
+        file_path = "deals.json"
+        content, _ = self._get_file_content(file_path)
+        
+        try:
+            return json.loads(content) if content else {}
+        except json.JSONDecodeError:
+            return {}
+    
+    def get_llm_outputs(self) -> Dict[str, Any]:
+        """Get LLM outputs from GitHub"""
+        if not self.token or not self.repo:
+            raise Exception("GitHub not configured")
+        
+        file_path = "llm_outputs.json"
+        content, _ = self._get_file_content(file_path)
+        
+        try:
+            return json.loads(content) if content else {}
+        except json.JSONDecodeError:
+            return {}
+    
     def backup_data(self, data: Dict[str, Any], file_name: str) -> bool:
         """Backup data to GitHub"""
         if not self.token or not self.repo:
-            print("GitHub not configured - skipping backup")
-            return False
+            raise Exception("GitHub not configured")
         
         file_path = f"backups/{file_name}"
         
@@ -140,46 +229,57 @@ class GitHubManager:
         # Update file
         return self._update_file(file_path, content, sha, message)
     
-    def get_annotations(self) -> Dict[str, Any]:
-        """Get annotations from GitHub"""
-        if not self.token or not self.repo:
-            return {}
-        
-        file_path = "data/annotations.json"
-        content, _ = self._get_file_content(file_path)
-        
-        try:
-            return json.loads(content) if content else {}
-        except json.JSONDecodeError:
-            return {}
-        
-    def get_users(self) -> Dict[str, Any]:
-        """Get users from GitHub"""
-        if not self.token or not self.repo:
-            return {"users": []}
-        
-        file_path = "data/users.json"
-        content, _ = self._get_file_content(file_path)
-        
-        try:
-            return json.loads(content) if content else {"users": []}
-        except json.JSONDecodeError:
-            return {"users": []}
-    
     def create_repository_structure(self) -> bool:
         """Create initial repository structure"""
         if not self.token or not self.repo:
             return False
         
         files_to_create = [
-            ("data/annotations.json", "{}"),
-            ("data/users.json", '{"users": []}'),
-            ("README.md", "# Deal Validation Annotations\n\nThis repository stores annotations from the deal validation app.")
+            ("annotations.json", "{}"),
+            ("users.json", '{"users": []}'),
+            ("deals.json", "{}"),
+            ("llm_outputs.json", "{}"),
+            ("README.md", "# Deal Validation Data Repository\n\nThis repository stores all data for the deal validation app.")
         ]
         
         success = True
         for file_path, content in files_to_create:
-            if not self._update_file(file_path, content, "", f"Initialize {file_path}"):
-                success = False
+            try:
+                # Check if file exists first
+                existing_content, _ = self._get_file_content(file_path)
+                if not existing_content:  # Only create if file doesn't exist
+                    if not self._update_file(file_path, content, "", f"Initialize {file_path}"):
+                        success = False
+            except:
+                if not self._update_file(file_path, content, "", f"Initialize {file_path}"):
+                    success = False
         
         return success
+    
+    def test_connection(self) -> bool:
+        """Test GitHub connection"""
+        if not self.token or not self.repo:
+            return False
+        
+        try:
+            url = f"https://api.github.com/repos/{self.repo}"
+            response = requests.get(url, headers=self._get_headers())
+            return response.status_code == 200
+        except:
+            return False
+    
+    def get_repository_info(self) -> Dict[str, Any]:
+        """Get repository information"""
+        if not self.token or not self.repo:
+            return {}
+        
+        try:
+            url = f"https://api.github.com/repos/{self.repo}"
+            response = requests.get(url, headers=self._get_headers())
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return {}
+        except:
+            return {}

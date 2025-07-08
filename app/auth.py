@@ -4,13 +4,16 @@ from jose import JWTError, jwt
 from fastapi import HTTPException, Cookie, Depends
 import os
 from dotenv import load_dotenv
-import json
+from .github_utils import GitHubManager
 
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 1
+
+# Initialize GitHub manager for auth
+github_manager = GitHubManager()
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Create JWT access token"""
@@ -36,17 +39,15 @@ def verify_token(token: str):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def get_current_user(access_token: Optional[str] = Cookie(None)):
-    """Get current user from JWT token"""
+    """Get current user from JWT token with GitHub verification"""
     if not access_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     email = verify_token(access_token)
     
-    # Verify user exists in users file
-    users_file = os.getenv("USERS_FILE", "./data/users.json")
+    # Verify user exists in GitHub data
     try:
-        with open(users_file, 'r') as f:
-            users_data = json.load(f)
+        users_data = github_manager.get_users()
         
         user_exists = False
         for user in users_data.get("users", []):
@@ -58,24 +59,20 @@ def get_current_user(access_token: Optional[str] = Cookie(None)):
             raise HTTPException(status_code=401, detail="User not found")
         
         return email
-    except FileNotFoundError:
-        raise HTTPException(status_code=500, detail="Users file not found")
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Invalid users file format")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Authentication error: {str(e)}")
 
 def is_admin(email: str) -> bool:
     """Check if user is admin"""
-    users_file = os.getenv("USERS_FILE", "./data/users.json")
     try:
-        with open(users_file, 'r') as f:
-            users_data = json.load(f)
+        users_data = github_manager.get_users()
         
         for user in users_data.get("users", []):
             if user["email"] == email:
                 return user.get("is_admin", False)
         
         return False
-    except (FileNotFoundError, json.JSONDecodeError):
+    except Exception:
         return False
 
 def get_admin_user(access_token: Optional[str] = Cookie(None)):

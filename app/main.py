@@ -7,6 +7,9 @@ import json
 import os
 from typing import Optional, Dict, List, Any
 from dotenv import load_dotenv
+import asyncio
+import threading
+import time
 
 from .models import *
 from .auth import *
@@ -27,73 +30,116 @@ templates = Jinja2Templates(directory="templates")
 # Initialize GitHub manager
 github_manager = GitHubManager()
 
-# File paths
-USERS_FILE = os.getenv("USERS_FILE", "./data/users.json")
-DEALS_FILE = os.getenv("DEALS_FILE", "./data/deals.json")
-LLM_OUTPUTS_FILE = os.getenv("LLM_OUTPUTS_FILE", "./data/llm_outputs.json")
-ANNOTATIONS_FILE = os.getenv("ANNOTATIONS_FILE", "./data/annotations.json")
+# In-memory cache for data
+_data_cache = {
+    "users": {"users": []},
+    "deals": {},
+    "llm_outputs": {},
+    "annotations": {}
+}
+
+# Cache timestamps for refresh logic
+_cache_timestamps = {
+    "users": 0,
+    "deals": 0,
+    "llm_outputs": 0,
+    "annotations": 0
+}
+
+# Cache refresh interval in seconds
+CACHE_REFRESH_INTERVAL = 300  # 5 minutes
 
 TARGET_ANNOTATIONS_PER_DEAL = 15
 
-def load_json_file(file_path: str) -> Dict:
-    """Load JSON file with error handling"""
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+def get_data_from_github_or_cache(data_type: str, force_refresh: bool = False) -> Dict:
+    """Get data from GitHub with caching mechanism"""
+    current_time = time.time()
+    
+    # Check if we need to refresh the cache
+    if (force_refresh or 
+        current_time - _cache_timestamps[data_type] > CACHE_REFRESH_INTERVAL):
         
-        # Normalize data structures
-        if file_path.endswith('deals.json'):
-            # Always work with dict structure
-            if isinstance(data, list):
-                normalized = {}
-                for deal in data:
-                    if 'deal_id' in deal:
-                        normalized[str(deal['deal_id'])] = deal
-                data = normalized
-            # Ensure all deal_ids are strings
+        try:
+            if data_type == "users":
+                new_data = github_manager.get_users()
+            elif data_type == "deals":
+                new_data = github_manager.get_deals()
+            elif data_type == "llm_outputs":
+                new_data = github_manager.get_llm_outputs()
+            elif data_type == "annotations":
+                new_data = github_manager.get_annotations()
             else:
-                normalized = {}
-                for key, value in data.items():
-                    normalized[str(key)] = value
-                data = normalized
-        
-        elif file_path.endswith('llm_outputs.json'):
-            # Normalize to dict if array
-            if isinstance(data, list):
-                normalized = {k: v for d in data for k, v in d.items()}
-                data = normalized
-            # Ensure all keys are strings
-            else:
-                normalized = {}
-                for key, value in data.items():
-                    normalized[str(key)] = value
-                data = normalized
-        
-        elif file_path.endswith('users.json'):
-            # Ensure proper structure
-            if not isinstance(data, dict) or 'users' not in data:
-                data = {"users": data if isinstance(data, list) else []}
-        
-        return data
-        
-    except FileNotFoundError:
-        if file_path.endswith('users.json'):
-            return {"users": []}
-        return {}
-    except json.JSONDecodeError as e:
-        print(f"JSON decode error in {file_path}: {e}")
-        if file_path.endswith('users.json'):
-            return {"users": []}
-        return {}
-    except Exception as e:
-        print(f"Error loading {file_path}: {e}")
-        return {}
+                return _data_cache.get(data_type, {})
+            
+            # Update cache
+            _data_cache[data_type] = new_data
+            _cache_timestamps[data_type] = current_time
+            
+            print(f"Refreshed {data_type} cache from GitHub")
+            
+        except Exception as e:
+            print(f"Failed to refresh {data_type} from GitHub: {e}")
+            # Return cached data if GitHub fetch fails
+            
+    return _data_cache.get(data_type, {})
 
-def save_json_file(file_path: str, data: Dict):
-    """Save JSON file"""
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+def load_json_data(data_type: str) -> Dict:
+    """Load JSON data from GitHub cache"""
+    data = get_data_from_github_or_cache(data_type)
+    
+    # Normalize data structures
+    if data_type == 'deals':
+        # Always work with dict structure
+        if isinstance(data, list):
+            normalized = {}
+            for deal in data:
+                if 'deal_id' in deal:
+                    normalized[str(deal['deal_id'])] = deal
+            data = normalized
+        # Ensure all deal_ids are strings
+        else:
+            normalized = {}
+            for key, value in data.items():
+                normalized[str(key)] = value
+            data = normalized
+    
+    elif data_type == 'llm_outputs':
+        # Normalize to dict if array
+        if isinstance(data, list):
+            normalized = {k: v for d in data for k, v in d.items()}
+            data = normalized
+        # Ensure all keys are strings
+        else:
+            normalized = {}
+            for key, value in data.items():
+                normalized[str(key)] = value
+            data = normalized
+    
+    elif data_type == 'users':
+        # Ensure proper structure
+        if not isinstance(data, dict) or 'users' not in data:
+            data = {"users": data if isinstance(data, list) else []}
+    
+    return data
+
+def save_json_data(data_type: str, data: Dict):
+    """Save JSON data to GitHub and update cache"""
+    # Update local cache immediately
+    _data_cache[data_type] = data
+    _cache_timestamps[data_type] = time.time()
+    
+    # Save to GitHub asynchronously
+    try:
+        if data_type == "users":
+            github_manager.update_users(data)
+        elif data_type == "annotations":
+            github_manager.update_annotations(data)
+        elif data_type == "deals":
+            github_manager.update_deals(data)
+        elif data_type == "llm_outputs":
+            github_manager.update_llm_outputs(data)
+    except Exception as e:
+        print(f"Failed to save {data_type} to GitHub: {e}")
 
 def get_deal_annotation_counts(annotations: Dict) -> Dict[str, int]:
     """Get count of unique annotators for each deal"""
@@ -104,8 +150,8 @@ def get_deal_annotation_counts(annotations: Dict) -> Dict[str, int]:
 
 def get_next_deal_for_user(email: str) -> Optional[str]:
     """Get next deal ID for user to annotate with intelligent distribution"""
-    deals = load_json_file(DEALS_FILE)
-    annotations = load_json_file(ANNOTATIONS_FILE)
+    deals = load_json_data("deals")
+    annotations = load_json_data("annotations")
     
     # Get deals this user has already completed
     user_completed_deals = set()
@@ -137,8 +183,8 @@ def get_next_deal_for_user(email: str) -> Optional[str]:
 
 def get_user_progress(email: str) -> Dict:
     """Get user's annotation progress with updated logic"""
-    annotations = load_json_file(ANNOTATIONS_FILE)
-    deals = load_json_file(DEALS_FILE)
+    annotations = load_json_data("annotations")
+    deals = load_json_data("deals")
     
     # Get deals this user has completed
     completed_deals = []
@@ -195,9 +241,9 @@ def get_admin_dashboard_context(request: Request, authenticated: bool = True):
             "authenticated": False
         }
     
-    users_data = load_json_file(USERS_FILE)
-    annotations = load_json_file(ANNOTATIONS_FILE)
-    deals = load_json_file(DEALS_FILE)
+    users_data = load_json_data("users")
+    annotations = load_json_data("annotations")
+    deals = load_json_data("deals")
     
     # Calculate detailed progress for each user
     user_progress = []
@@ -228,6 +274,21 @@ def get_admin_dashboard_context(request: Request, authenticated: bool = True):
         "authenticated": True
     }
 
+# Initialize cache on startup
+@app.on_event("startup")
+async def startup_event():
+    """Load initial data from GitHub on startup"""
+    print("Loading initial data from GitHub...")
+    try:
+        # Force refresh all data on startup
+        get_data_from_github_or_cache("users", force_refresh=True)
+        get_data_from_github_or_cache("deals", force_refresh=True)
+        get_data_from_github_or_cache("llm_outputs", force_refresh=True)
+        get_data_from_github_or_cache("annotations", force_refresh=True)
+        print("Initial data loaded successfully")
+    except Exception as e:
+        print(f"Failed to load initial data: {e}")
+
 @app.get("/", response_class=HTMLResponse)
 async def login_page(request: Request):
     """Login page"""
@@ -236,7 +297,7 @@ async def login_page(request: Request):
 @app.post("/login")
 async def login(request: Request, email: str = Form(...)):
     """Handle user login"""
-    users_data = load_json_file(USERS_FILE)
+    users_data = load_json_data("users")
     
     # Check if user exists
     user_exists = False
@@ -293,8 +354,8 @@ async def get_deal_distribution(admin_token: Optional[str] = Cookie(None)):
     if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    deals = load_json_file(DEALS_FILE)
-    annotations = load_json_file(ANNOTATIONS_FILE)
+    deals = load_json_data("deals")
+    annotations = load_json_data("annotations")
     deal_counts = get_deal_annotation_counts(annotations)
     
     distribution_stats = {
@@ -336,7 +397,7 @@ async def get_deal_distribution(admin_token: Optional[str] = Cookie(None)):
 @app.get("/activities/{deal_id}", response_class=HTMLResponse)
 async def view_activities(request: Request, deal_id: str, current_user: str = Depends(get_current_user)):
     """View deal activities"""
-    deals = load_json_file(DEALS_FILE)
+    deals = load_json_data("deals")
     
     # Ensure deal_id is string
     deal_id = str(deal_id)
@@ -376,8 +437,8 @@ async def view_activities(request: Request, deal_id: str, current_user: str = De
 @app.get("/rating/{deal_id}", response_class=HTMLResponse)
 async def rating_interface(request: Request, deal_id: str, current_user: str = Depends(get_current_user)):
     """Rating interface for LLM outputs"""
-    deals = load_json_file(DEALS_FILE)
-    llm_outputs = load_json_file(LLM_OUTPUTS_FILE)
+    deals = load_json_data("deals")
+    llm_outputs = load_json_data("llm_outputs")
 
     # Ensure deal_id is string
     deal_id = str(deal_id)
@@ -390,13 +451,13 @@ async def rating_interface(request: Request, deal_id: str, current_user: str = D
             "progress": get_user_progress(current_user)
         })
     
-    # if deal_id not in llm_outputs:
-    #     return templates.TemplateResponse("rating.html", {
-    #         "request": request,
-    #         "error": f"AI analysis not found for deal {deal_id}",
-    #         "user_email": current_user,
-    #         "progress": get_user_progress(current_user)
-    #     })
+    if deal_id not in llm_outputs:
+        return templates.TemplateResponse("rating.html", {
+            "request": request,
+            "error": f"AI analysis not found for deal {deal_id}",
+            "user_email": current_user,
+            "progress": get_user_progress(current_user)
+        })
     
     # Check if user already completed this deal
     progress = get_user_progress(current_user)
@@ -473,21 +534,15 @@ async def submit_rating(request: Request, current_user: str = Depends(get_curren
     }
     
     # Load and update annotations
-    annotations = load_json_file(ANNOTATIONS_FILE)
+    annotations = load_json_data("annotations")
     
     if deal_id not in annotations:
         annotations[deal_id] = {}
     
     annotations[deal_id][current_user] = annotation
     
-    # Save to local file
-    save_json_file(ANNOTATIONS_FILE, annotations)
-    
     # Save to GitHub
-    try:
-        github_manager.update_annotations(annotations)
-    except Exception as e:
-        print(f"GitHub update failed: {e}")
+    save_json_data("annotations", annotations)
     
     # Get next deal
     next_deal = get_next_deal_for_user(current_user)
@@ -547,7 +602,7 @@ async def add_user(
     if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=403, detail="Admin authentication required")
     
-    users_data = load_json_file(USERS_FILE)
+    users_data = load_json_data("users")
     
     # Check if user already exists (case-insensitive)
     for user in users_data.get("users", []):
@@ -566,12 +621,7 @@ async def add_user(
         users_data["users"] = []
     
     users_data["users"].append(new_user)
-    save_json_file(USERS_FILE, users_data)
-
-    try:
-        github_manager.update_users(users_data)
-    except Exception as e:
-        print(f"GitHub update failed: {e}")
+    save_json_data("users", users_data)
     
     return JSONResponse({"message": "User added successfully"})
 
@@ -587,7 +637,7 @@ async def remove_user(
     if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=403, detail="Admin authentication required")
     
-    users_data = load_json_file(USERS_FILE)
+    users_data = load_json_data("users")
     
     # Remove user from users list
     original_count = len(users_data.get("users", []))
@@ -599,16 +649,11 @@ async def remove_user(
     if len(users_data["users"]) == original_count:
         raise HTTPException(status_code=404, detail="User not found")
     
-    save_json_file(USERS_FILE, users_data)
-
-    try:
-        github_manager.update_users(users_data)
-    except Exception as e:
-        print(f"GitHub update failed: {e}")
+    save_json_data("users", users_data)
     
     # Remove user's annotations if not keeping progress
     if not keep_progress:
-        annotations = load_json_file(ANNOTATIONS_FILE)
+        annotations = load_json_data("annotations")
         modified = False
         
         for deal_id in list(annotations.keys()):
@@ -620,7 +665,7 @@ async def remove_user(
                     del annotations[deal_id]
         
         if modified:
-            save_json_file(ANNOTATIONS_FILE, annotations)
+            save_json_data("annotations", annotations)
     
     return JSONResponse({"message": "User removed successfully"})
 
@@ -644,9 +689,9 @@ async def get_admin_stats(request: Request, admin_token: Optional[str] = Cookie(
     if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    users_data = load_json_file(USERS_FILE)
-    annotations = load_json_file(ANNOTATIONS_FILE)
-    deals = load_json_file(DEALS_FILE)
+    users_data = load_json_data("users")
+    annotations = load_json_data("annotations")
+    deals = load_json_data("deals")
     
     # Calculate statistics with new logic
     total_users = len(users_data.get("users", []))
@@ -682,13 +727,13 @@ async def download_data(data_type: str, admin_token: Optional[str] = Cookie(None
         raise HTTPException(status_code=403, detail="Admin access required")
     
     if data_type == "users":
-        data = load_json_file(USERS_FILE)
+        data = load_json_data("users")
     elif data_type == "annotations":
-        data = load_json_file(ANNOTATIONS_FILE)
+        data = load_json_data("annotations")
     elif data_type == "deals":
-        data = load_json_file(DEALS_FILE)
+        data = load_json_data("deals")
     elif data_type == "llm_outputs":
-        data = load_json_file(LLM_OUTPUTS_FILE)
+        data = load_json_data("llm_outputs")
     else:
         raise HTTPException(status_code=404, detail="Invalid data type")
     
@@ -700,48 +745,114 @@ async def download_data(data_type: str, admin_token: Optional[str] = Cookie(None
         }
     )
 
+@app.get("/api/refresh-cache")
+async def refresh_cache(admin_token: Optional[str] = Cookie(None)):
+    """Manually refresh cache from GitHub"""
+    if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        # Force refresh all data
+        get_data_from_github_or_cache("users", force_refresh=True)
+        get_data_from_github_or_cache("deals", force_refresh=True)
+        get_data_from_github_or_cache("llm_outputs", force_refresh=True)
+        get_data_from_github_or_cache("annotations", force_refresh=True)
+        
+        return JSONResponse({"message": "Cache refreshed successfully"})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to refresh cache: {str(e)}")
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
     try:
-        # Check essential files
-        essential_files = [USERS_FILE, DEALS_FILE, LLM_OUTPUTS_FILE, ANNOTATIONS_FILE]
-        missing_files = []
-        
-        for file_path in essential_files:
-            if not os.path.exists(file_path):
-                missing_files.append(os.path.basename(file_path))
-        
-        if missing_files:
-            return {
-                "status": "unhealthy",
-                "reason": f"Missing files: {', '.join(missing_files)}",
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        
-        # Test file readability
-        for file_path in essential_files:
-            try:
-                load_json_file(file_path)
-            except Exception as e:
-                return {
-                    "status": "unhealthy",
-                    "reason": f"Cannot read {os.path.basename(file_path)}: {str(e)}",
-                    "timestamp": datetime.utcnow().isoformat()
-                }
-        
-        return {
-            "status": "healthy",
-            "version": "2.0.0",
-            "timestamp": datetime.utcnow().isoformat()
+        # Check GitHub connectivity and data availability
+        github_status = {
+            "users": False,
+            "deals": False, 
+            "llm_outputs": False,
+            "annotations": False
         }
         
+        errors = []
+        
+        # Test GitHub connectivity for each data type
+        for data_type in github_status.keys():
+            try:
+                data = get_data_from_github_or_cache(data_type, force_refresh=True)
+                if data:
+                    github_status[data_type] = True
+                else:
+                    errors.append(f"No data available for {data_type}")
+            except Exception as e:
+                errors.append(f"Failed to load {data_type}: {str(e)}")
+        
+        # Check if GitHub manager is properly configured
+        if not github_manager.token or not github_manager.repo:
+            errors.append("GitHub configuration missing (token or repo)")
+        
+        # Determine overall health
+        if not any(github_status.values()):
+            return JSONResponse({
+                "status": "unhealthy",
+                "reason": "No data sources available",
+                "errors": errors,
+                "github_status": github_status,
+                "timestamp": datetime.utcnow().isoformat()
+            }, status_code=503)
+        
+        if errors:
+            return JSONResponse({
+                "status": "degraded",
+                "reason": "Some data sources unavailable",
+                "errors": errors,
+                "github_status": github_status,
+                "timestamp": datetime.utcnow().isoformat()
+            }, status_code=200)
+        
+        return JSONResponse({
+            "status": "healthy",
+            "version": "2.0.0",
+            "github_status": github_status,
+            "cache_info": {
+                "last_refresh": {
+                    data_type: datetime.fromtimestamp(timestamp).isoformat() 
+                    for data_type, timestamp in _cache_timestamps.items()
+                }
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        
     except Exception as e:
-        return {
+        return JSONResponse({
             "status": "unhealthy",
             "reason": str(e),
             "timestamp": datetime.utcnow().isoformat()
-        }
+        }, status_code=503)
+
+def get_current_user_updated(access_token: Optional[str] = Cookie(None)):
+    """Updated get_current_user that checks GitHub data"""
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    email = verify_token(access_token)
+    
+    # Verify user exists in GitHub data
+    users_data = load_json_data("users")
+    
+    user_exists = False
+    for user in users_data.get("users", []):
+        if user["email"] == email:
+            user_exists = True
+            break
+    
+    if not user_exists:
+        raise HTTPException(status_code=401, detail="User not found")
+    
+    return email
+
+# Replace the dependency
+app.dependency_overrides[get_current_user] = get_current_user_updated
 
 if __name__ == "__main__":
     import uvicorn
