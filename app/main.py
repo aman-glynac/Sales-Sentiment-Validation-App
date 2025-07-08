@@ -762,6 +762,80 @@ async def refresh_cache(admin_token: Optional[str] = Cookie(None)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to refresh cache: {str(e)}")
 
+@app.get("/api/test-github-files")
+async def test_github_files(admin_token: Optional[str] = Cookie(None)):
+    """Test function to check what files exist and where we're looking"""
+    if not admin_token or admin_token != os.getenv("ADMIN_PASSWORD"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    file_paths_to_check = [
+        "users.json",
+        "deals.json", 
+        "llm_outputs.json",
+        "annotations.json",
+        "data/users.json",
+        "data/deals.json",
+        "data/llm_outputs.json", 
+        "data/annotations.json"
+    ]
+    
+    results = {}
+    
+    for file_path in file_paths_to_check:
+        try:
+            content, sha = github_manager._get_file_content(file_path)
+            if content:
+                # Try to parse as JSON to check validity
+                try:
+                    parsed = json.loads(content)
+                    results[file_path] = {
+                        "exists": True,
+                        "valid_json": True,
+                        "content_length": len(content),
+                        "sha": sha[:8] if sha else "no-sha",
+                        "preview": str(parsed)[:100] + "..." if len(str(parsed)) > 100 else str(parsed)
+                    }
+                except json.JSONDecodeError as e:
+                    results[file_path] = {
+                        "exists": True,
+                        "valid_json": False,
+                        "content_length": len(content),
+                        "sha": sha[:8] if sha else "no-sha",
+                        "error": str(e),
+                        "preview": content[:100] + "..." if len(content) > 100 else content
+                    }
+            else:
+                results[file_path] = {
+                    "exists": False,
+                    "valid_json": False,
+                    "content_length": 0,
+                    "sha": "none",
+                    "preview": "File not found"
+                }
+        except Exception as e:
+            results[file_path] = {
+                "exists": False,
+                "valid_json": False,
+                "content_length": 0,
+                "sha": "error",
+                "error": str(e),
+                "preview": f"Error: {str(e)}"
+            }
+    
+    return {
+        "github_repo": github_manager.repo,
+        "github_branch": github_manager.branch,
+        "github_configured": bool(github_manager.token and github_manager.repo),
+        "files_checked": results,
+        "current_paths_being_used": {
+            "users": "data/users.json",
+            "deals": "data/deals.json", 
+            "llm_outputs": "data/llm_outputs.json",
+            "annotations": "data/annotations.json"
+        },
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""

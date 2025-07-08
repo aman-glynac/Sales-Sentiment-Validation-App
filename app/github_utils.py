@@ -238,7 +238,8 @@ class GitHubManager:
             ("data/annotations.json", "{}"),
             ("data/users.json", '{"users": []}'),
             ("data/deals.json", "{}"),
-            ("data/llm_outputs.json", "{}")
+            ("data/llm_outputs.json", "{}"),
+            ("README.md", "# Deal Validation Data Repository\n\nThis repository stores all data for the deal validation app.")
         ]
         
         success = True
