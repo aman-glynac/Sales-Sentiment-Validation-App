@@ -162,7 +162,7 @@ class GitHubManager:
         if not self.token or not self.repo:
             raise Exception("GitHub not configured")
         
-        file_path = "annotations.json"
+        file_path = "data/annotations.json"
         content, _ = self._get_file_content(file_path)
         
         try:
@@ -175,7 +175,7 @@ class GitHubManager:
         if not self.token or not self.repo:
             raise Exception("GitHub not configured")
         
-        file_path = "users.json"
+        file_path = "data/users.json"
         content, _ = self._get_file_content(file_path)
         
         try:
@@ -188,7 +188,7 @@ class GitHubManager:
         if not self.token or not self.repo:
             raise Exception("GitHub not configured")
         
-        file_path = "deals.json"
+        file_path = "data/deals.json"
         content, _ = self._get_file_content(file_path)
         
         try:
@@ -201,7 +201,7 @@ class GitHubManager:
         if not self.token or not self.repo:
             raise Exception("GitHub not configured")
         
-        file_path = "llm_outputs.json"
+        file_path = "data/llm_outputs.json"
         content, _ = self._get_file_content(file_path)
         
         try:
