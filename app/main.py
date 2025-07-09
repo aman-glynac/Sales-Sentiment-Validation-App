@@ -130,6 +130,23 @@ async def get_admin_dashboard_context(request: Request, authenticated: bool = Tr
         "authenticated": True
     }
 
+# Custom exception handler for authentication errors
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Handle HTTP exceptions, especially authentication errors"""
+    if exc.status_code == 401:
+        # Clear any existing tokens and redirect to login
+        response = RedirectResponse(url="/", status_code=302)
+        response.delete_cookie("access_token")
+        response.delete_cookie("admin_token")
+        return response
+    
+    # For other HTTP exceptions, return JSON response
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
 # Initialize database on startup
 @app.on_event("startup")
 async def startup_event():

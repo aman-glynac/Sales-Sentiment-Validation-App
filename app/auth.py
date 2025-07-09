@@ -39,7 +39,13 @@ async def get_current_user(access_token: Optional[str] = Cookie(None)):
     if not access_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    email = verify_token(access_token)
+    try:
+        email = verify_token(access_token)
+    except HTTPException as e:
+        # Token expired or invalid - redirect to login
+        if e.status_code == 401:
+            raise HTTPException(status_code=401, detail="Token expired")
+        raise e
     
     # Import here to avoid circular imports
     from .database import db_manager
