@@ -24,7 +24,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 # Templates
 templates = Jinja2Templates(directory="templates")
 
-TARGET_ANNOTATIONS_PER_DEAL = 15
+TARGET_ANNOTATIONS_PER_DEAL = 7
 
 def parse_json_field(data, field_name, default=None):
     """Parse JSON field from database"""
